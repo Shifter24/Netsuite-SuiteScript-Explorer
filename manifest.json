@@ -1,0 +1,33 @@
+{
+    "name": "Suite Scripts finder extension",
+    "description": "Extension to find content inside SuiteScript files",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://*.netsuite.com/app/*"],
+            "js": ["content-script.js"]
+        }
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting",
+        "tabs"
+    ],
+    "host_permissions": [
+        "https://*.netsuite.com/app/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["inject-script.js"],
+            "matches": ["https://*.netsuite.com/*"]
+        }
+    ]
+}

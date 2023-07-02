@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <title>File cabinet extension</title>
+</head>
+
+<body>
+    <div class="extension-container">
+        <div class="search-container">
+            <input type="text" id="query-search">
+            <button id="get-files-netsuite">Get files</button>
+        </div>
+
+        <div class="show-files-container">
+            <table class="table-show-files">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Word count</th>
+                        <th>Go to</th>
+                    </tr>
+                </thead>
+                <tbody id="body-show-files">
+                    <!-- <tr>
+                        <td>Data 1</td>
+                        <td>Data 2</td>
+                        <td>Data 3</td>
+                    </tr> -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

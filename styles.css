@@ -1,0 +1,27 @@
+*{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body{
+    width: 400px;
+    height: 500px;
+}
+
+.extension-container{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    padding: 0 20px;
+}
+
+.search-container{
+    display: flex;
+    gap: 6px;
+}
+
+.table-show-files{
+    
+}
