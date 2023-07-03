@@ -27,17 +27,31 @@
             <!-- <img src="assets/netsuite.png" alt=""> -->
         </div>
 
-        <div class="search-container">
-            <input type="text" id="query-search">
-            <button id="get-files-netsuite">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="100%"
-                    height="100%" viewBox="0 0 24 24" stroke-width="1" stroke="whitesmoke" fill="none"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-                    <path d="M21 21l-6 -6" />
-                </svg>
-            </button>
+        <div>
+
+            <div class="checkbox-wrapper-35">
+                <input checked class="switch" type="checkbox" id="switch" name="switch-whole-word" value="private">
+                <label for="switch">
+                    <span class="switch-x-text">Match Whole Word </span>
+                    <span class="switch-x-toggletext">
+                        <span class="switch-x-unchecked"><span class="switch-x-hiddenlabel">Unchecked: </span>Off</span>
+                        <span class="switch-x-checked"><span class="switch-x-hiddenlabel">Checked: </span>On</span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="search-container">
+                <input type="text" id="query-search" placeholder="custbody_test">
+                <button id="get-files-netsuite">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="100%"
+                        height="100%" viewBox="0 0 24 24" stroke-width="1" stroke="whitesmoke" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                        <path d="M21 21l-6 -6" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div class="show-files-container">
@@ -72,7 +86,6 @@
                                         </svg></a>
                             </td>
                         </tr> -->
-
                     </tbody>
                 </table>
             </div>

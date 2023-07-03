@@ -4,6 +4,7 @@ const $querySearch = document.getElementById("query-search");
 const $bodyShowFiles = document.getElementById("body-show-files");
 const $loader = document.querySelector(".lds-ring");
 const $totalResults = document.getElementById("total-results");
+const $wholeWordFilter = document.getElementsByName("switch-whole-word")[0];
 
 let netsuiteFiles = [];
 
@@ -43,10 +44,6 @@ $getFilesBtn.addEventListener("click", async () => {
     }
 
     const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
-    if (!formattedNetsuiteFiles || formattedNetsuiteFiles.length < 1) {
-        closeLoader();
-        return;
-    }
 
     showNetsuiteFiles(formattedNetsuiteFiles);
 
@@ -66,57 +63,79 @@ function closeLoader() {
 function showNetsuiteFiles(filteredFiles) {
     $bodyShowFiles.innerHTML = "";
     $totalResults.innerHTML = "0";
+    $totalResults.innerHTML = filteredFiles.length;
 
-    filteredFiles.forEach(file => {
-        $bodyShowFiles.innerHTML += `
+    if (!filteredFiles || filteredFiles.length < 1) {
+        $bodyShowFiles.innerHTML = `
+            <tr><td></td></tr>
+            <tr><td></td></tr>
+            <tr><td></td></tr>
             <tr>
-                <td>${file.name}</td>
-                <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                <td><a href="${file.url}"><svg xmlns="http://www.w3.org/2000/svg"
-                    class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
-                    viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                    <path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" />
-                    <path d="M16.5 17.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
-                    <path d="M18.5 19.5l2.5 2.5" />
-                    </svg></a></td>
+                <td colspan="3" style="text-align: center;">No results found</td>
             </tr> 
         `
-    });
+    }
+    else {
+        filteredFiles.forEach(file => {
+            $bodyShowFiles.innerHTML += `
+                <tr>
+                    <td>${file.name}</td>
+                    <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
+                    <td><a href="${file.url}"><svg xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
+                        viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                        <path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" />
+                        <path d="M16.5 17.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
+                        <path d="M18.5 19.5l2.5 2.5" />
+                        </svg></a></td>
+                </tr> 
+            `
+        });
+    }
 
-    $totalResults.innerHTML = filteredFiles.length;
 }
 
 async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
-    let files = [];
+    try {
+        let files = [];
 
-    if (!netsuiteFiles || netsuiteFiles.length < 1) return files;
+        if (!netsuiteFiles || netsuiteFiles.length < 1) return files;
 
-    for (const file of netsuiteFiles) {
-        const fileName = file.valuesByKey.name.value;
-        const urlOpen = domain + file.valuesByKey.url.value;
+        for (const file of netsuiteFiles) {
+            const fileName = file.valuesByKey.name.value;
+            const urlOpen = domain + file.valuesByKey.url.value;
 
-        const fileContent = await getFileContent(urlOpen);
-        if (!fileContent) continue;
+            const fileContent = await getFileContent(urlOpen);
+            if (!fileContent) continue;
 
-        let url = new URL(urlOpen);
-        const searchParams = new URLSearchParams(url.search);
-        const id = searchParams.get("id");
+            let url = new URL(urlOpen);
+            const searchParams = new URLSearchParams(url.search);
+            const id = searchParams.get("id");
 
-        url = domain + `/app/common/media/mediaitem.nl?id=${id}`
+            url = domain + `/app/common/media/mediaitem.nl?id=${id}`
 
-        // Find word inside fileContent
-        var regex = new RegExp('\\b' + queryToSearch + '\\b', 'gi');
-        var matches = fileContent.match(regex);
-        var count = matches ? matches.length : 0;
-        if (!count || count < 1) continue;
+            // Find word inside fileContent
+            var regex = "";
 
-        files.push({ name: fileName, url: url, count: count });
+            // If checkbox filter is checked, search for whole word, else search for all matches
+            ($wholeWordFilter.checked) ? regex = new RegExp('\\b' + queryToSearch + '\\b', 'gi') : regex = new RegExp(queryToSearch, 'gi');
+
+            var matches = fileContent.match(regex);
+            var count = matches ? matches.length : 0;
+            if (!count || count < 1) continue;
+
+            files.push({ name: fileName, url: url, count: count });
+        }
+
+        return files;
+    } catch (error) {
+        closeLoader();
+        console.error(error);
     }
 
-    return files;
 }
 
 
