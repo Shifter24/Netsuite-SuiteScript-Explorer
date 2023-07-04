@@ -149,15 +149,19 @@ async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
         const files = await Promise.all(
             netsuiteFiles.filter(file => {
                 const fileName = file.valuesByKey.name.value;
+                console.log(fileName);
                 if (![".js"].some(ext => fileName.endsWith(ext)) && fileName.includes(".")) {
                     return false;
                 }
                 return true;
             }).map(async file => {
                 const fileName = file.valuesByKey.name.value;
+                if(fileName == "SWC_CS_Zip_Code.js"){
+                    debugger;
+                }
                 const urlOpen = domain + file.valuesByKey.url.value;
                 const fileContent = await getFileContent(urlOpen);
-                if (!fileContent) return null;
+                if (!fileContent) return;
 
                 const url = new URL(urlOpen);
                 const searchParams = new URLSearchParams(url.search);
@@ -189,14 +193,13 @@ async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
 async function getFileContent(url) {
     try {
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error("Error fetching file: " + response.status);
-        }
+        if (!response.ok) return null;
+
         const content = await response.text();
         return content;
 
     } catch (error) {
-        console.error(error);
+        return null;
     }
 }
 
