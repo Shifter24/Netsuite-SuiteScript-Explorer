@@ -4,19 +4,19 @@ debugger;
 window.postMessage({ netsuiteFiles: getSuiteScriptFiles() || null, domain: getDomain()});
 
 // ------------------- AUXILIAR FUNCTIONS -------------------------------
-function getSuiteScriptFiles(folder = -15)
+function getSuiteScriptFiles(folder = ["-15", "-16"])
 {
-    return fileSearch = nlapiSearchRecord("file", null,
-        [
-            ["folder", "anyof", "-15"],
-            "AND", 
-            ["filetype","anyof","JAVASCRIPT"]
-        ],
-        [
-            new nlobjSearchColumn("name").setSort(false),
-            new nlobjSearchColumn("folder"),
-            new nlobjSearchColumn("url")
-        ]
+    return fileSearch = nlapiSearchRecord("file",null,
+    [
+       ["folder","anyof","-15","-16"], 
+       "AND", 
+       ["filetype","anyof","JAVASCRIPT"]
+    ], 
+    [
+       new nlobjSearchColumn("name").setSort(false), 
+       new nlobjSearchColumn("folder"), 
+       new nlobjSearchColumn("url")
+    ]
     );
 }
 
