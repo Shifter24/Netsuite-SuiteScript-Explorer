@@ -55,10 +55,20 @@
         </div>
 
         <div class="show-files-container">
-            <div style="display: flex; gap: 2px; margin: 6px 0;">
-                <p style="font-weight: 600; font-size: 10pt;">Total results:</p>
-                <p style="font-size: 10pt;" id="total-results">0</p>
+            <div style="display: flex;justify-content: space-between;align-items: center;margin: .5em 0;">
+                <div style="display: flex; gap: 2px; margin: 6px 0;">
+                    <p style="font-weight: 600; font-size: 10pt;">Total results:</p>
+                    <p style="font-size: 10pt;" id="total-results">0</p>
+                </div>
+                <div>
+                    <!-- CopyToClipboard -->
+                    <div id="copyToClipboard">
+                        <img style="width: 26px;" id="copyToClipboardStatic" src="assets/copy-to-clipboard.png" alt="Copy to clipboard" >
+                        <img style="width: 26px;" id="copyToClipboardGif" src="assets/copy-to-clipboard-anim.gif" alt="Copy to clipboard" >
+                    </div>
+                </div>
             </div>
+
             <div class="container-table" style="border: 1px solid black; height: 310px;">
                 <table class="table-show-files">
                     <thead>
@@ -69,23 +79,6 @@
                         </tr>
                     </thead>
                     <tbody id="body-show-files">
-                        <!-- <tr>
-                            <td>SDB-php-api-images-fenicio-CL.js</td>
-                            <td>10 times</td>
-                            <td>
-                                <a id="link-to-file" href="https://www.google.com.uy"><svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
-                                            viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
-                                            stroke-linecap="round" stroke-linejoin="round">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                            <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                                            <path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" />
-                                            <path d="M16.5 17.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
-                                            <path d="M18.5 19.5l2.5 2.5" />
-                                        </svg></a>
-                            </td>
-                        </tr> -->
                     </tbody>
                 </table>
             </div>

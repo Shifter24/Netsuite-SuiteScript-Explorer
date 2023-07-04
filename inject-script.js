@@ -12,7 +12,9 @@ function getSuiteScriptFiles(folder = -15)
 {
     var fileSearch = nlapiSearchRecord("file", null,
         [
-            ["folder", "anyof", "-15"]
+            ["folder", "anyof", "-15"],
+            "AND", 
+            ["filetype","anyof","JAVASCRIPT"]
         ],
         [
             new nlobjSearchColumn("name").setSort(false),

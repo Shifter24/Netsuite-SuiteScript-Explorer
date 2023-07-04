@@ -6,12 +6,6 @@
     "background": {
         "service_worker": "background.js"
     },
-    "content_scripts": [
-        {
-            "matches": ["https://*.netsuite.com/app/*"],
-            "js": ["content-script.js"]
-        }
-    ],
     "action": {
         "default_popup": "popup.html"
     },
