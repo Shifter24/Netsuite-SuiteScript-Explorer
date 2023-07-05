@@ -39,9 +39,40 @@ document.addEventListener('DOMContentLoaded', function () {
     copyToClipboard.style.display = 'none';
 });
 
+// Handle button click event
 $getFilesBtn.addEventListener("click", async () => {
-    
+    $querySearch.blur();
+    await triggerFunctionality();
+});
 
+// Handle Enter key press event
+$querySearch.addEventListener("keyup", async (event) => {
+
+    if (event.key == "Enter") {
+        $querySearch.blur();
+        await triggerFunctionality();
+    }
+});
+
+
+
+// Copy to clipboard btn
+copyToClipboard.addEventListener('click', async function () {
+
+    await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
+
+    copyToClipboardStatic.style.display = 'none';
+    copyToClipboardGif.style.display = 'block';
+
+    setTimeout(function () {
+        copyToClipboardStatic.style.display = 'block';
+        copyToClipboardGif.style.display = 'none';
+    }, 1000);
+});
+
+// -------------------- AUXILIAR FUNCTIONS ------------------------------------
+
+async function triggerFunctionality() {
     showLoader();
 
     // Hide copy to clipboard btn
@@ -72,24 +103,7 @@ $getFilesBtn.addEventListener("click", async () => {
 
         searchFiles(filesArray, queryToSearch, netsuiteDomain);
     }
-
-});
-
-// Copy to clipboard btn
-copyToClipboard.addEventListener('click', async function () {
-
-    await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
-
-    copyToClipboardStatic.style.display = 'none';
-    copyToClipboardGif.style.display = 'block';
-
-    setTimeout(function () {
-        copyToClipboardStatic.style.display = 'block';
-        copyToClipboardGif.style.display = 'none';
-    }, 1000);
-});
-
-// -------------------- AUXILIAR FUNCTIONS ------------------------------------
+}
 
 function showLoader() {
     $loader.style.display = "flex";
@@ -133,7 +147,7 @@ function showNetsuiteFiles(filteredFiles) {
                     <td>${file.name}</td>
                     <td>${file.folder}</td>
                     <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                    <td><a href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
+                    <td><a title="Go to file" href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
                         class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
                         viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -222,7 +236,7 @@ async function setCopyToClipboard(text) {
 
 // Listen for content-script response in order to save gathered files
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-    
+
     if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) {
         closeLoader();
         return;
