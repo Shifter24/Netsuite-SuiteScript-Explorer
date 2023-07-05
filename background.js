@@ -18,6 +18,12 @@ function deleteAllChunksFromIndexedDB() {
 
   request.onsuccess = function (event) {
     const db = event.target.result;
+
+    // Check if storeName exists before deleting
+    if (!db.objectStoreNames.contains(storeName)) {
+      return; // Exit the function or handle the situation accordingly
+    }
+
     const transaction = db.transaction(storeName, "readwrite");
     const store = transaction.objectStore(storeName);
     const clearRequest = store.clear();

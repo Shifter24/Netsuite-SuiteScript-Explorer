@@ -164,7 +164,7 @@ function showNetsuiteFiles(filteredFiles) {
 
 }
 
-async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1200) {
+async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1000) {
     try {
         if (!netsuiteFiles || netsuiteFiles.length < 1) return [];
 
@@ -315,6 +315,14 @@ async function retrieveChunksFromIndexedDB() {
 
         request.onsuccess = function (event) {
             const db = event.target.result;
+
+            // Check if storeName exists before retrieving chunks
+            if (!db.objectStoreNames.contains(storeName)) {
+                resolve([]); // Return empty array if storeName does not exist
+                db.close(); // Close the database connection
+                return;
+            }
+
             const transaction = db.transaction(storeName, "readonly");
             const store = transaction.objectStore(storeName);
             const chunks = [];
@@ -341,7 +349,8 @@ async function retrieveChunksFromIndexedDB() {
 function saveChunkToIndexedDB(chunk, chunkIndex) {
     const dbName = "netsuiteFilesDB";
     const storeName = "netsuiteFilesStore";
-    const request = indexedDB.open(dbName);
+    const version = Date.now();
+    const request = indexedDB.open(dbName, version);
 
     request.onerror = function (event) {
         console.error("IndexedDB error:", event.target.error);
@@ -349,12 +358,23 @@ function saveChunkToIndexedDB(chunk, chunkIndex) {
 
     request.onupgradeneeded = function (event) {
         const db = event.target.result;
-        const store = db.createObjectStore(storeName, { keyPath: "id" });
-        store.createIndex("chunkIndex", "chunkIndex", { unique: false });
+
+        // Create the object store if it doesn't exist
+        if (!db.objectStoreNames.contains(storeName)) {
+            const store = db.createObjectStore(storeName, { keyPath: "id" });
+            store.createIndex("chunkIndex", "chunkIndex", { unique: false });
+        }
     };
 
     request.onsuccess = function (event) {
         const db = event.target.result;
+
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.error("Object store not found:", storeName);
+            db.close();
+            return;
+        }
+
         const transaction = db.transaction(storeName, "readwrite");
         const store = transaction.objectStore(storeName);
 
@@ -402,6 +422,12 @@ function deleteAllChunksFromIndexedDB() {
 
     request.onsuccess = function (event) {
         const db = event.target.result;
+
+        // Check if storeName exists before deleting
+        if (!db.objectStoreNames.contains(storeName)) {
+            return; // Exit the function or handle the situation accordingly
+        }
+
         const transaction = db.transaction(storeName, "readwrite");
         const store = transaction.objectStore(storeName);
         const clearRequest = store.clear();
