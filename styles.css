@@ -70,24 +70,24 @@ body{
 }
 
 .search-container input{
-    width: 90%;
+        width: 90%;
     padding: 5px 10px;
     outline: none;
-    color: #F5F5F5;
-    background-color: #070707;
-    border: none;
+    color: #000000;
+    background-color: #ffffff;
+    border: 1px solid #070707;
     font-size: 10pt;
 }
 
 .search-container button{
-    width: 10%;
+       width: 10%;
     padding: 5px 10px;
     cursor: pointer;
-    background-color: #070707;
+    background-color: #ffffff;
     border-left: 1px solid whitesmoke;
-    border-right: none;
-    border-bottom: none;
-    border-top: none;
+    border-right: 1px solid #070707;
+    border-bottom: 1px solid #070707;
+    border-top: 1px solid #070707;
 }
 
 /* Filter options */
@@ -229,6 +229,16 @@ body{
 .container-table{
     overflow-y: scroll;
     padding: 0 20px;
+    box-shadow: 0px 6px 4px -1px #7c7c7c;
+    border: 1px solid black; height: 310px;
+}
+
+.container-above-files{
+  display: flex;justify-content: space-between;align-items: center;margin: .5em 0;
+}
+
+.container-display-total-results{
+  display: flex; gap: 2px; margin: 6px 0;
 }
 
 .table-show-files{
@@ -250,5 +260,9 @@ body{
 th:first-child,
 td:first-child {
   text-align: left;
+}
+
+.support-container{
+  display: flex; margin: 10px 0; justify-content: space-between; align-items: center;
 }
 
