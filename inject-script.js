@@ -1,4 +1,4 @@
-debugger;
+
 
 // Send a message to the content-script with all SuiteScript files
 window.postMessage({ netsuiteFiles: getSuiteScriptFiles() || null, domain: getDomain() });

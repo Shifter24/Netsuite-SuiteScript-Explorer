@@ -16,12 +16,31 @@ let netsuiteFilesCopy = [];
 // Only show functionality when we are in netsuite page
 document.addEventListener('DOMContentLoaded', function () {
 
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        var currentUrl = tabs[0].url;
+        var allowedUrl = "netsuite.com/app";
+
+        if (!currentUrl.includes(allowedUrl)) {
+            // document.body.style.display = 'none';
+            document.body.style.width = '210px';
+            document.body.style.height = '80px';
+            $extensionContainer.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">Error!</h4>
+                    <p>You are not in a NetSuite page.</p>
+                    <hr>
+                    <p class="mb-0">Please go to a NetSuite page and try again.</p>
+                </div>
+            `;
+        }
+    });
+
     // Hide copy to clipboard btn
     copyToClipboard.style.display = 'none';
 });
 
 $getFilesBtn.addEventListener("click", async () => {
-    debugger;
+    
 
     showLoader();
 
@@ -49,7 +68,7 @@ $getFilesBtn.addEventListener("click", async () => {
     else {
 
         // Get netsuite domain from storage
-        const {netsuiteDomain} = await chrome.storage.local.get("netsuiteDomain");
+        const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
 
         searchFiles(filesArray, queryToSearch, netsuiteDomain);
     }
@@ -131,39 +150,48 @@ function showNetsuiteFiles(filteredFiles) {
 
 }
 
-async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
+async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1200) {
     try {
         if (!netsuiteFiles || netsuiteFiles.length < 1) return [];
 
-        const files = await Promise.all(
-            netsuiteFiles.filter(file => {
-                return true;
-            }).map(async file => {
+        const totalFiles = netsuiteFiles.length;
+        let processedFiles = 0;
+        let resultFiles = [];
+
+        while (processedFiles < totalFiles) {
+            const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
+
+            const batchRequests = batchFiles.map(async (file) => {
                 const fileName = file.name;
                 const urlOpen = domain + file.url;
                 const fileContent = await getFileContent(urlOpen);
-                if (!fileContent) return;
+
+                if (!fileContent) return null;
 
                 const url = new URL(urlOpen);
                 const searchParams = new URLSearchParams(url.search);
                 const id = searchParams.get("id");
                 const mediaItemUrl = domain + `/app/common/media/mediaitem.nl?id=${id}`;
 
-                // Find word inside fileContent
-                var regex = "";
+                const regex = ($wholeWordFilter.checked) ? new RegExp('\\b' + queryToSearch + '\\b', 'gi') : new RegExp(queryToSearch, 'gi');
+                const matches = fileContent.match(regex);
+                const count = matches ? matches.length : 0;
 
-                // If checkbox filter is checked, search for whole word, else search for all matches
-                ($wholeWordFilter.checked) ? regex = new RegExp('\\b' + queryToSearch + '\\b', 'gi') : regex = new RegExp(queryToSearch, 'gi');
+                if (count > 0) {
+                    return { name: fileName, folder: file.folder, url: mediaItemUrl, count };
+                }
 
-                var matches = fileContent.match(regex);
-                var count = matches ? matches.length : 0;
-                if (!count || count < 1) return null;
+                return null;
+            });
 
-                return { name: fileName, folder: file.folder, url: mediaItemUrl, count };
-            })
-        );
+            const batchResults = await Promise.all(batchRequests);
+            const batchFilesFiltered = batchResults.filter(Boolean);
 
-        return files.filter(Boolean);
+            resultFiles = resultFiles.concat(batchFilesFiltered);
+            processedFiles += batchFiles.length;
+        }
+
+        return resultFiles;
     } catch (error) {
         closeLoader();
         return [];
@@ -177,10 +205,13 @@ async function getFileContent(url) {
 
         const content = await response.text();
         return content;
-
     } catch (error) {
         return null;
     }
+}
+
+function delayExecution(delay) {
+    return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
 async function setCopyToClipboard(text) {
@@ -191,7 +222,7 @@ async function setCopyToClipboard(text) {
 
 // Listen for content-script response in order to save gathered files
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-    debugger;
+    
     if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) {
         closeLoader();
         return;
