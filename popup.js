@@ -16,73 +16,49 @@ let netsuiteFilesCopy = [];
 // Only show functionality when we are in netsuite page
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Hide copy to clipboard btn
-    copyToClipboard.style.display = 'none';
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        var currentUrl = tabs[0].url;
+        var allowedUrl = "netsuite.com/app";
 
-    // Get the current active tab URL
-    chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-        debugger;
-        // Execute the content script only if we dont have netsuite properties already declared
-        const { netsuiteFiles } = await chrome.storage.local.get("netsuiteFiles");
-        const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
-
-        if (!netsuiteFiles || !netsuiteDomain) {
-
-            showLoader();
-
-            // Inject the content script
-            chrome.scripting.executeScript({
-                target: { tabId: tabs[0].id },
-                files: ["content-script.js"]
-            });
+        if (!currentUrl.includes(allowedUrl)) {
+            // document.body.style.display = 'none';
+            document.body.style.width = '210px';
+            document.body.style.height = '80px';
+            $extensionContainer.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">Error!</h4>
+                    <p>You are not in a NetSuite page.</p>
+                    <hr>
+                    <p class="mb-0">Please go to a NetSuite page and try again.</p>
+                </div>
+            `;
         }
-
     });
-});
-
-$getFilesBtn.addEventListener("click", async () => {
-    debugger;
-    showLoader();
 
     // Hide copy to clipboard btn
     copyToClipboard.style.display = 'none';
-
-    const queryToSearch = $querySearch.value;
-    if (!queryToSearch) {
-        alert("Insert field to search!.");
-        closeLoader();
-        return;
-    }
-
-    // Get all suiteScript files from 
-    const { netsuiteFiles } = await chrome.storage.local.get("netsuiteFiles");
-    if (!netsuiteFiles || netsuiteFiles.length < 1) {
-        closeLoader();
-        return;
-    }
-
-    const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
-    if (!netsuiteDomain) {
-        closeLoader();
-        return;
-    }
-
-    const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
-
-    showNetsuiteFiles(formattedNetsuiteFiles);
-
-    netsuiteFilesCopy = formattedNetsuiteFiles;
-    
-    if(netsuiteFilesCopy.length > 0) {
-        copyToClipboard.style.display = 'block';
-    }
-
-    closeLoader();
 });
+
+// Handle button click event
+$getFilesBtn.addEventListener("click", async () => {
+    $querySearch.blur();
+    await triggerFunctionality();
+});
+
+// Handle Enter key press event
+$querySearch.addEventListener("keyup", async (event) => {
+
+    if (event.key == "Enter") {
+        $querySearch.blur();
+        await triggerFunctionality();
+    }
+});
+
+
 
 // Copy to clipboard btn
 copyToClipboard.addEventListener('click', async function () {
-    debugger;
+
     await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
 
     copyToClipboardStatic.style.display = 'none';
@@ -96,12 +72,57 @@ copyToClipboard.addEventListener('click', async function () {
 
 // -------------------- AUXILIAR FUNCTIONS ------------------------------------
 
+async function triggerFunctionality() {
+    showLoader();
+
+    // Hide copy to clipboard btn
+    copyToClipboard.style.display = 'none';
+
+    const queryToSearch = $querySearch.value;
+    if (!queryToSearch) {
+        alert("Insert field to search!.");
+        closeLoader();
+        return;
+    }
+
+    const tabId = await getActiveTabId();
+
+    // Get array files from indexedDB
+    const [filesArray] = await retrieveChunksFromIndexedDB();
+
+    if (!filesArray || filesArray.length === 0) {
+        const responseExecute = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ["content-script.js"]
+        });
+    }
+    else {
+
+        // Get netsuite domain from storage
+        const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
+
+        searchFiles(filesArray, queryToSearch, netsuiteDomain);
+    }
+}
+
 function showLoader() {
     $loader.style.display = "flex";
 }
 
 function closeLoader() {
     $loader.style.display = "none";
+}
+
+async function getActiveTabId() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length > 0) {
+                resolve(tabs[0].id);
+            } else {
+                reject(new Error("Unable to retrieve active tab ID."));
+            }
+        });
+    });
 }
 
 function showNetsuiteFiles(filteredFiles) {
@@ -115,7 +136,7 @@ function showNetsuiteFiles(filteredFiles) {
             <tr><td></td></tr>
             <tr><td></td></tr>
             <tr>
-                <td colspan="3" style="text-align: center;">No results found</td>
+                <td colspan="4" style="text-align: center;">No results found</td>
             </tr> 
         `
     }
@@ -124,8 +145,9 @@ function showNetsuiteFiles(filteredFiles) {
             $bodyShowFiles.innerHTML += `
                 <tr>
                     <td>${file.name}</td>
+                    <td>${file.folder}</td>
                     <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                    <td><a href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
+                    <td><a title="Go to file" href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
                         class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
                         viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -142,50 +164,50 @@ function showNetsuiteFiles(filteredFiles) {
 
 }
 
-async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
+async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1200) {
     try {
         if (!netsuiteFiles || netsuiteFiles.length < 1) return [];
 
-        const files = await Promise.all(
-            netsuiteFiles.filter(file => {
-                const fileName = file.valuesByKey.name.value;
-                console.log(fileName);
-                if (![".js"].some(ext => fileName.endsWith(ext)) && fileName.includes(".")) {
-                    return false;
-                }
-                return true;
-            }).map(async file => {
-                const fileName = file.valuesByKey.name.value;
-                if(fileName == "SWC_CS_Zip_Code.js"){
-                    debugger;
-                }
-                const urlOpen = domain + file.valuesByKey.url.value;
+        const totalFiles = netsuiteFiles.length;
+        let processedFiles = 0;
+        let resultFiles = [];
+
+        while (processedFiles < totalFiles) {
+            const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
+
+            const batchRequests = batchFiles.map(async (file) => {
+                const fileName = file.name;
+                const urlOpen = domain + file.url;
                 const fileContent = await getFileContent(urlOpen);
-                if (!fileContent) return;
+
+                if (!fileContent) return null;
 
                 const url = new URL(urlOpen);
                 const searchParams = new URLSearchParams(url.search);
                 const id = searchParams.get("id");
                 const mediaItemUrl = domain + `/app/common/media/mediaitem.nl?id=${id}`;
 
-                // Find word inside fileContent
-                var regex = "";
+                const regex = ($wholeWordFilter.checked) ? new RegExp('\\b' + queryToSearch + '\\b', 'gi') : new RegExp(queryToSearch, 'gi');
+                const matches = fileContent.match(regex);
+                const count = matches ? matches.length : 0;
 
-                // If checkbox filter is checked, search for whole word, else search for all matches
-                ($wholeWordFilter.checked) ? regex = new RegExp('\\b' + queryToSearch + '\\b', 'gi') : regex = new RegExp(queryToSearch, 'gi');
+                if (count > 0) {
+                    return { name: fileName, folder: file.folder, url: mediaItemUrl, count };
+                }
 
-                var matches = fileContent.match(regex);
-                var count = matches ? matches.length : 0;
-                if (!count || count < 1) return null;
+                return null;
+            });
 
-                return { name: fileName, url: mediaItemUrl, count };
-            })
-        );
+            const batchResults = await Promise.all(batchRequests);
+            const batchFilesFiltered = batchResults.filter(Boolean);
 
-        return files.filter(Boolean);
+            resultFiles = resultFiles.concat(batchFilesFiltered);
+            processedFiles += batchFiles.length;
+        }
+
+        return resultFiles;
     } catch (error) {
         closeLoader();
-        console.error(error);
         return [];
     }
 }
@@ -197,27 +219,203 @@ async function getFileContent(url) {
 
         const content = await response.text();
         return content;
-
     } catch (error) {
         return null;
     }
 }
 
-async function setCopyToClipboard(text){
+function delayExecution(delay) {
+    return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+async function setCopyToClipboard(text) {
     await navigator.clipboard.writeText(text);
 }
 
 // -------------------- CHROME EXTENSION FUNCTIONS ----------------------------
 
 // Listen for content-script response in order to save gathered files
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 
-    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) return;
+    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) {
+        closeLoader();
+        return;
+    }
 
+    const queryToSearch = $querySearch.value;
+    if (!queryToSearch) {
+        alert("Insert field to search!.");
+        closeLoader();
+        return;
+    }
+
+    // Clear storage
     chrome.storage.local.clear();
 
-    chrome.storage.local.set({ netsuiteFiles: message.netsuiteFiles });
+    // Save files into indexedDB
+    saveChunkToIndexedDB(message.netsuiteFiles, 0);
+
+    // Saving domain
     chrome.storage.local.set({ netsuiteDomain: message.domain });
 
-    closeLoader();
+    await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
 });
+
+async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
+
+    if (!netsuiteFiles || netsuiteFiles.length < 1) {
+        closeLoader();
+        return;
+    }
+
+    if (!netsuiteDomain) {
+        closeLoader();
+        return;
+    }
+
+    const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
+
+    showNetsuiteFiles(formattedNetsuiteFiles);
+
+    netsuiteFilesCopy = formattedNetsuiteFiles;
+
+    if (netsuiteFilesCopy.length > 0) {
+        copyToClipboard.style.display = 'block';
+    }
+
+    closeLoader();
+}
+
+// Set chrome storage local chunks spliting files array
+function divideFilesArrayStorage(filesArray) {
+    const divideSize = 1000;
+    const divided = Math.ceil(filesArray.length / divideSize);
+
+    let start = 0;
+    let end = divideSize;
+
+    for (let i = 0; i < divided; i++) {
+        const chunk = filesArray.slice(start, end);
+        saveChunkToIndexedDB(chunk, i + 1);
+        start = end;
+        end += divideSize;
+    }
+}
+
+async function retrieveChunksFromIndexedDB() {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    return new Promise((resolve, reject) => {
+        request.onerror = function (event) {
+            console.error("IndexedDB error:", event.target.error);
+            reject([]);
+        };
+
+        request.onsuccess = function (event) {
+            const db = event.target.result;
+            const transaction = db.transaction(storeName, "readonly");
+            const store = transaction.objectStore(storeName);
+            const chunks = [];
+
+            const cursorRequest = store.openCursor();
+            cursorRequest.onsuccess = function (event) {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const chunkObject = cursor.value;
+                    chunks.push(chunkObject.data);
+                    cursor.continue();
+                } else {
+                    resolve(chunks);
+                }
+            };
+
+            transaction.oncomplete = function (event) {
+                db.close();
+            };
+        };
+    });
+}
+
+function saveChunkToIndexedDB(chunk, chunkIndex) {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    request.onerror = function (event) {
+        console.error("IndexedDB error:", event.target.error);
+    };
+
+    request.onupgradeneeded = function (event) {
+        const db = event.target.result;
+        const store = db.createObjectStore(storeName, { keyPath: "id" });
+        store.createIndex("chunkIndex", "chunkIndex", { unique: false });
+    };
+
+    request.onsuccess = function (event) {
+        const db = event.target.result;
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
+
+        const getRequest = store.get(chunkIndex);
+
+        getRequest.onsuccess = function (event) {
+            const existingChunk = event.target.result;
+            if (existingChunk) {
+                console.log(`Chunk ${chunkIndex} already exists in IndexedDB.`);
+                // Handle the case when the chunk already exists
+            } else {
+                const chunkObject = {
+                    id: chunkIndex,
+                    data: chunk,
+                };
+
+                const addRequest = store.add(chunkObject);
+
+                addRequest.onsuccess = function (event) {
+                    console.log(`Chunk ${chunkIndex} saved to IndexedDB.`);
+                    // Handle the case when the chunk is successfully added
+                };
+
+                addRequest.onerror = function (event) {
+                    console.error("Error saving chunk to IndexedDB:", event.target.error);
+                    // Handle the error case when adding the chunk fails
+                };
+            }
+        };
+
+        transaction.oncomplete = function (event) {
+            db.close();
+        };
+    };
+}
+
+function deleteAllChunksFromIndexedDB() {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    request.onerror = function (event) {
+        console.error("IndexedDB error:", event.target.error);
+    };
+
+    request.onsuccess = function (event) {
+        const db = event.target.result;
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = function (event) {
+            console.log("All chunks deleted from IndexedDB.");
+        };
+
+        clearRequest.onerror = function (event) {
+            console.error("Error deleting chunks from IndexedDB:", event.target.error);
+        };
+
+        transaction.oncomplete = function (event) {
+            db.close();
+        };
+    };
+}

@@ -1,1 +1,1 @@
-# Netsuite-finder-extension
+# Netsuite-SuiteScripts-finder-extension

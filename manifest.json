@@ -1,6 +1,6 @@
 {
-    "name": "Suite Scripts finder extension",
-    "description": "Extension to find content inside SuiteScript files",
+    "name": "Netsuite Suite Scripts explorer extension",
+    "description": "Extension that allows you to find Suite Scripts that contain a certain string.",
     "version": "1.0.0",
     "manifest_version": 3,
     "background": {
