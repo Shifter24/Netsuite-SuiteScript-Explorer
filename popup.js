@@ -21,8 +21,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Get the current active tab URL
     chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-        debugger;
+        
         // Execute the content script only if we dont have netsuite properties already declared
+        const allStorage = await chrome.storage.local.get();
         const { netsuiteFiles } = await chrome.storage.local.get("netsuiteFiles");
         const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
 
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 $getFilesBtn.addEventListener("click", async () => {
-    debugger;
+    
     showLoader();
 
     // Hide copy to clipboard btn
@@ -55,7 +56,13 @@ $getFilesBtn.addEventListener("click", async () => {
     }
 
     // Get all suiteScript files from 
-    const { netsuiteFiles } = await chrome.storage.local.get("netsuiteFiles");
+    const [getAllArraysFiles] = await retrieveChunksFromIndexedDB() || [];
+    if (!getAllArraysFiles || getAllArraysFiles.length < 1) {
+        closeLoader();
+        return;
+    }
+
+    const netsuiteFiles = getAllArraysFiles.flat();
     if (!netsuiteFiles || netsuiteFiles.length < 1) {
         closeLoader();
         return;
@@ -72,8 +79,8 @@ $getFilesBtn.addEventListener("click", async () => {
     showNetsuiteFiles(formattedNetsuiteFiles);
 
     netsuiteFilesCopy = formattedNetsuiteFiles;
-    
-    if(netsuiteFilesCopy.length > 0) {
+
+    if (netsuiteFilesCopy.length > 0) {
         copyToClipboard.style.display = 'block';
     }
 
@@ -82,7 +89,7 @@ $getFilesBtn.addEventListener("click", async () => {
 
 // Copy to clipboard btn
 copyToClipboard.addEventListener('click', async function () {
-    debugger;
+    
     await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
 
     copyToClipboardStatic.style.display = 'none';
@@ -115,7 +122,7 @@ function showNetsuiteFiles(filteredFiles) {
             <tr><td></td></tr>
             <tr><td></td></tr>
             <tr>
-                <td colspan="3" style="text-align: center;">No results found</td>
+                <td colspan="4" style="text-align: center;">No results found</td>
             </tr> 
         `
     }
@@ -124,6 +131,7 @@ function showNetsuiteFiles(filteredFiles) {
             $bodyShowFiles.innerHTML += `
                 <tr>
                     <td>${file.name}</td>
+                    <td>${file.folder}</td>
                     <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
                     <td><a href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
                         class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
@@ -148,18 +156,10 @@ async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
 
         const files = await Promise.all(
             netsuiteFiles.filter(file => {
-                const fileName = file.valuesByKey.name.value;
-                console.log(fileName);
-                if (![".js"].some(ext => fileName.endsWith(ext)) && fileName.includes(".")) {
-                    return false;
-                }
                 return true;
             }).map(async file => {
-                const fileName = file.valuesByKey.name.value;
-                if(fileName == "SWC_CS_Zip_Code.js"){
-                    debugger;
-                }
-                const urlOpen = domain + file.valuesByKey.url.value;
+                const fileName = file.name;
+                const urlOpen = domain + file.url;
                 const fileContent = await getFileContent(urlOpen);
                 if (!fileContent) return;
 
@@ -178,14 +178,13 @@ async function getFilesQuery(netsuiteFiles, domain, queryToSearch) {
                 var count = matches ? matches.length : 0;
                 if (!count || count < 1) return null;
 
-                return { name: fileName, url: mediaItemUrl, count };
+                return { name: fileName, folder: file.folder, url: mediaItemUrl, count };
             })
         );
 
         return files.filter(Boolean);
     } catch (error) {
         closeLoader();
-        console.error(error);
         return [];
     }
 }
@@ -203,21 +202,165 @@ async function getFileContent(url) {
     }
 }
 
-async function setCopyToClipboard(text){
+async function setCopyToClipboard(text) {
     await navigator.clipboard.writeText(text);
 }
 
 // -------------------- CHROME EXTENSION FUNCTIONS ----------------------------
 
 // Listen for content-script response in order to save gathered files
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    debugger;
     if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) return;
 
     chrome.storage.local.clear();
 
-    chrome.storage.local.set({ netsuiteFiles: message.netsuiteFiles });
+    // Get array files from indexedDB
+    const [filesArray] = await retrieveChunksFromIndexedDB();
+
+    // If filesArray is more than message.netsuiteFiles, delete the rest of filesArray
+    if (!filesArray || (filesArray.length != message.netsuiteFiles.length)) {
+        deleteAllChunksFromIndexedDB();
+         // Save files array to indexedDB
+        saveChunkToIndexedDB(message.netsuiteFiles, 0);
+    }
+
+    // Save domain name into chrome storage local
     chrome.storage.local.set({ netsuiteDomain: message.domain });
 
     closeLoader();
 });
+
+// Set chrome storage local chunks spliting files array
+function divideFilesArrayStorage(filesArray) {
+    const divideSize = 1000;
+    const divided = Math.ceil(filesArray.length / divideSize);
+
+    let start = 0;
+    let end = divideSize;
+
+    for (let i = 0; i < divided; i++) {
+        const chunk = filesArray.slice(start, end);
+        saveChunkToIndexedDB(chunk, i + 1);
+        start = end;
+        end += divideSize;
+    }
+}
+
+async function retrieveChunksFromIndexedDB() {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    return new Promise((resolve, reject) => {
+        request.onerror = function (event) {
+            console.error("IndexedDB error:", event.target.error);
+            reject([]);
+        };
+
+        request.onsuccess = function (event) {
+            const db = event.target.result;
+            const transaction = db.transaction(storeName, "readonly");
+            const store = transaction.objectStore(storeName);
+            const chunks = [];
+
+            const cursorRequest = store.openCursor();
+            cursorRequest.onsuccess = function (event) {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const chunkObject = cursor.value;
+                    chunks.push(chunkObject.data);
+                    cursor.continue();
+                } else {
+                    resolve(chunks);
+                }
+            };
+
+            transaction.oncomplete = function (event) {
+                db.close();
+            };
+        };
+    });
+}
+
+function saveChunkToIndexedDB(chunk, chunkIndex) {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    request.onerror = function (event) {
+        console.error("IndexedDB error:", event.target.error);
+    };
+
+    request.onupgradeneeded = function (event) {
+        const db = event.target.result;
+        const store = db.createObjectStore(storeName, { keyPath: "id" });
+        store.createIndex("chunkIndex", "chunkIndex", { unique: false });
+    };
+
+    request.onsuccess = function (event) {
+        const db = event.target.result;
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
+
+        const getRequest = store.get(chunkIndex);
+
+        getRequest.onsuccess = function (event) {
+            const existingChunk = event.target.result;
+            if (existingChunk) {
+                console.log(`Chunk ${chunkIndex} already exists in IndexedDB.`);
+                // Handle the case when the chunk already exists
+            } else {
+                const chunkObject = {
+                    id: chunkIndex,
+                    data: chunk,
+                };
+
+                const addRequest = store.add(chunkObject);
+
+                addRequest.onsuccess = function (event) {
+                    console.log(`Chunk ${chunkIndex} saved to IndexedDB.`);
+                    // Handle the case when the chunk is successfully added
+                };
+
+                addRequest.onerror = function (event) {
+                    console.error("Error saving chunk to IndexedDB:", event.target.error);
+                    // Handle the error case when adding the chunk fails
+                };
+            }
+        };
+
+        transaction.oncomplete = function (event) {
+            db.close();
+        };
+    };
+}
+
+function deleteAllChunksFromIndexedDB() {
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const request = indexedDB.open(dbName);
+
+    request.onerror = function (event) {
+        console.error("IndexedDB error:", event.target.error);
+    };
+
+    request.onsuccess = function (event) {
+        const db = event.target.result;
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
+        const clearRequest = store.clear();
+
+        clearRequest.onsuccess = function (event) {
+            console.log("All chunks deleted from IndexedDB.");
+        };
+
+        clearRequest.onerror = function (event) {
+            console.error("Error deleting chunks from IndexedDB:", event.target.error);
+        };
+
+        transaction.oncomplete = function (event) {
+            db.close();
+        };
+    };
+}

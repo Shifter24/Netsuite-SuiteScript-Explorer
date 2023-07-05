@@ -1,4 +1,4 @@
-debugger;
+
 
 injectScript(chrome.runtime.getURL("inject-script.js"), "body");
 
@@ -18,7 +18,7 @@ function injectScript(file_path, tag) {
     node.appendChild(script);
     
     script.onload = function() {
-        debugger;
+        
       script.remove();
     };
   }
