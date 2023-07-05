@@ -18,31 +18,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Hide copy to clipboard btn
     copyToClipboard.style.display = 'none';
-
-    // Get the current active tab URL
-    chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-        
-        // Execute the content script only if we dont have netsuite properties already declared
-        const allStorage = await chrome.storage.local.get();
-        const { netsuiteFiles } = await chrome.storage.local.get("netsuiteFiles");
-        const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
-
-        if (!netsuiteFiles || !netsuiteDomain) {
-
-            showLoader();
-
-            // Inject the content script
-            chrome.scripting.executeScript({
-                target: { tabId: tabs[0].id },
-                files: ["content-script.js"]
-            });
-        }
-
-    });
 });
 
 $getFilesBtn.addEventListener("click", async () => {
-    
+    debugger;
+
     showLoader();
 
     // Hide copy to clipboard btn
@@ -55,41 +35,30 @@ $getFilesBtn.addEventListener("click", async () => {
         return;
     }
 
-    // Get all suiteScript files from 
-    const [getAllArraysFiles] = await retrieveChunksFromIndexedDB() || [];
-    if (!getAllArraysFiles || getAllArraysFiles.length < 1) {
-        closeLoader();
-        return;
+    const tabId = await getActiveTabId();
+
+    // Get array files from indexedDB
+    const [filesArray] = await retrieveChunksFromIndexedDB();
+
+    if (!filesArray || filesArray.length === 0) {
+        const responseExecute = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ["content-script.js"]
+        });
+    }
+    else {
+
+        // Get netsuite domain from storage
+        const {netsuiteDomain} = await chrome.storage.local.get("netsuiteDomain");
+
+        searchFiles(filesArray, queryToSearch, netsuiteDomain);
     }
 
-    const netsuiteFiles = getAllArraysFiles.flat();
-    if (!netsuiteFiles || netsuiteFiles.length < 1) {
-        closeLoader();
-        return;
-    }
-
-    const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
-    if (!netsuiteDomain) {
-        closeLoader();
-        return;
-    }
-
-    const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
-
-    showNetsuiteFiles(formattedNetsuiteFiles);
-
-    netsuiteFilesCopy = formattedNetsuiteFiles;
-
-    if (netsuiteFilesCopy.length > 0) {
-        copyToClipboard.style.display = 'block';
-    }
-
-    closeLoader();
 });
 
 // Copy to clipboard btn
 copyToClipboard.addEventListener('click', async function () {
-    
+
     await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
 
     copyToClipboardStatic.style.display = 'none';
@@ -109,6 +78,18 @@ function showLoader() {
 
 function closeLoader() {
     $loader.style.display = "none";
+}
+
+async function getActiveTabId() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length > 0) {
+                resolve(tabs[0].id);
+            } else {
+                reject(new Error("Unable to retrieve active tab ID."));
+            }
+        });
+    });
 }
 
 function showNetsuiteFiles(filteredFiles) {
@@ -211,25 +192,54 @@ async function setCopyToClipboard(text) {
 // Listen for content-script response in order to save gathered files
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     debugger;
-    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) return;
-
-    chrome.storage.local.clear();
-
-    // Get array files from indexedDB
-    const [filesArray] = await retrieveChunksFromIndexedDB();
-
-    // If filesArray is more than message.netsuiteFiles, delete the rest of filesArray
-    if (!filesArray || (filesArray.length != message.netsuiteFiles.length)) {
-        deleteAllChunksFromIndexedDB();
-         // Save files array to indexedDB
-        saveChunkToIndexedDB(message.netsuiteFiles, 0);
+    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) {
+        closeLoader();
+        return;
     }
 
-    // Save domain name into chrome storage local
+    const queryToSearch = $querySearch.value;
+    if (!queryToSearch) {
+        alert("Insert field to search!.");
+        closeLoader();
+        return;
+    }
+
+    // Clear storage
+    chrome.storage.local.clear();
+
+    // Save files into indexedDB
+    saveChunkToIndexedDB(message.netsuiteFiles, 0);
+
+    // Saving domain
     chrome.storage.local.set({ netsuiteDomain: message.domain });
 
-    closeLoader();
+    await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
 });
+
+async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
+
+    if (!netsuiteFiles || netsuiteFiles.length < 1) {
+        closeLoader();
+        return;
+    }
+
+    if (!netsuiteDomain) {
+        closeLoader();
+        return;
+    }
+
+    const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
+
+    showNetsuiteFiles(formattedNetsuiteFiles);
+
+    netsuiteFilesCopy = formattedNetsuiteFiles;
+
+    if (netsuiteFilesCopy.length > 0) {
+        copyToClipboard.style.display = 'block';
+    }
+
+    closeLoader();
+}
 
 // Set chrome storage local chunks spliting files array
 function divideFilesArrayStorage(filesArray) {
