@@ -88,6 +88,8 @@ async function triggerFunctionality() {
     // Get array files from indexedDB
     const [filesArray] = await retrieveChunksFromIndexedDB();
 
+    const netsuiteDomain = await getNetsuiteDomain();
+
     if (!filesArray || filesArray.length === 0) {
         const responseExecute = await chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -95,10 +97,6 @@ async function triggerFunctionality() {
         });
     }
     else {
-
-        // Get netsuite domain from storage
-        const { netsuiteDomain } = await chrome.storage.local.get("netsuiteDomain");
-
         searchFiles(filesArray, queryToSearch, netsuiteDomain);
     }
 }
@@ -177,10 +175,10 @@ async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
             const matches = fileContent.match(regex);
             const count = matches ? matches.length : 0;
 
-            const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.id}`);
+            const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.internalid}`);
 
             if (count > 0) {
-                filteredFiles.push({ name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null});
+                filteredFiles.push({ name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
             }
         });
 
@@ -210,6 +208,27 @@ function delayExecution(delay) {
 
 async function setCopyToClipboard(text) {
     await navigator.clipboard.writeText(text);
+}
+
+async function getNetsuiteDomain() {
+    var url = await getCurrentTabUrl();
+    if (!url) return null;
+
+    var domain = url.split('/')[2];
+
+    return domain;
+}
+
+function getCurrentTabUrl() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length > 0) {
+                resolve(tabs[0].url);
+            } else {
+                reject(new Error("Unable to retrieve active tab URL."));
+            }
+        });
+    });
 }
 
 // -------------------- CHROME EXTENSION FUNCTIONS ----------------------------
