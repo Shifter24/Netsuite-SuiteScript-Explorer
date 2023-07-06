@@ -125,7 +125,7 @@ async function getActiveTabId() {
     });
 }
 
-function showNetsuiteFiles(filteredFiles) {
+function showNetsuiteFiles(filteredFiles, domain) {
     $bodyShowFiles.innerHTML = "";
     $totalResults.innerHTML = "0";
     $totalResults.innerHTML = filteredFiles.length;
@@ -142,12 +142,16 @@ function showNetsuiteFiles(filteredFiles) {
     }
     else {
         filteredFiles.forEach(file => {
+
+            var fileUrl = (file.script ? `${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : file.url);
+
             $bodyShowFiles.innerHTML += `
                 <tr>
-                    <td>${file.name}</td>
+                    <td>${(file.script ? file.script.name : file.name)}</td>
+                    <td>${(file.script ? file.script.scripttype : 'File')}</td>
                     <td>${file.folder}</td>
                     <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                    <td><a title="Go to file" href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
+                    <td><a title="Go to file" href="${fileUrl}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
                         class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
                         viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -192,7 +196,7 @@ async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1
                 const count = matches ? matches.length : 0;
 
                 if (count > 0) {
-                    return { name: fileName, folder: file.folder, url: mediaItemUrl, count };
+                    return { name: fileName, folder: file.folder, url: mediaItemUrl, count, script: file.script || null };
                 }
 
                 return null;
@@ -275,7 +279,7 @@ async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
 
     const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
 
-    showNetsuiteFiles(formattedNetsuiteFiles);
+    showNetsuiteFiles(formattedNetsuiteFiles, netsuiteDomain);
 
     netsuiteFilesCopy = formattedNetsuiteFiles;
 
