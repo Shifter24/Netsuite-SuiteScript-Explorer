@@ -54,8 +54,6 @@ $querySearch.addEventListener("keyup", async (event) => {
     }
 });
 
-
-
 // Copy to clipboard btn
 copyToClipboard.addEventListener('click', async function () {
 
@@ -143,15 +141,13 @@ function showNetsuiteFiles(filteredFiles, domain) {
     else {
         filteredFiles.forEach(file => {
 
-            var fileUrl = (file.script ? `${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : file.url);
-
             $bodyShowFiles.innerHTML += `
                 <tr>
                     <td>${(file.script ? file.script.name : file.name)}</td>
                     <td>${(file.script ? file.script.scripttype : 'File')}</td>
                     <td>${file.folder}</td>
                     <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                    <td><a title="Go to file" href="${fileUrl}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
+                    <td><a title="Go to file" href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
                         class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
                         viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -168,48 +164,28 @@ function showNetsuiteFiles(filteredFiles, domain) {
 
 }
 
-async function getFilesQuery(netsuiteFiles, domain, queryToSearch, batchSize = 1000) {
+async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
     try {
         if (!netsuiteFiles || netsuiteFiles.length < 1) return [];
 
-        const totalFiles = netsuiteFiles.length;
-        let processedFiles = 0;
-        let resultFiles = [];
+        const filteredFiles = [];
 
-        while (processedFiles < totalFiles) {
-            const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
+        netsuiteFiles.forEach(file => {
+            const fileContent = file.content;
 
-            const batchRequests = batchFiles.map(async (file) => {
-                const fileName = file.name;
-                const urlOpen = domain + file.url;
-                const fileContent = await getFileContent(urlOpen);
+            const regex = ($wholeWordFilter.checked) ? new RegExp('\\b' + queryToSearch + '\\b', 'gi') : new RegExp(queryToSearch, 'gi');
+            const matches = fileContent.match(regex);
+            const count = matches ? matches.length : 0;
 
-                if (!fileContent) return null;
+            const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.id}`);
 
-                const url = new URL(urlOpen);
-                const searchParams = new URLSearchParams(url.search);
-                const id = searchParams.get("id");
-                const mediaItemUrl = domain + `/app/common/media/mediaitem.nl?id=${id}`;
+            if (count > 0) {
+                filteredFiles.push({ name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null});
+            }
+        });
 
-                const regex = ($wholeWordFilter.checked) ? new RegExp('\\b' + queryToSearch + '\\b', 'gi') : new RegExp(queryToSearch, 'gi');
-                const matches = fileContent.match(regex);
-                const count = matches ? matches.length : 0;
+        return filteredFiles;
 
-                if (count > 0) {
-                    return { name: fileName, folder: file.folder, url: mediaItemUrl, count, script: file.script || null };
-                }
-
-                return null;
-            });
-
-            const batchResults = await Promise.all(batchRequests);
-            const batchFilesFiltered = batchResults.filter(Boolean);
-
-            resultFiles = resultFiles.concat(batchFilesFiltered);
-            processedFiles += batchFiles.length;
-        }
-
-        return resultFiles;
     } catch (error) {
         closeLoader();
         return [];
@@ -256,6 +232,9 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     // Clear storage
     chrome.storage.local.clear();
 
+    // Add file content to files in order to save into indexedDB
+    message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 1000);
+
     // Save files into indexedDB
     saveChunkToIndexedDB(message.netsuiteFiles, 0);
 
@@ -277,7 +256,7 @@ async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
         return;
     }
 
-    const formattedNetsuiteFiles = await getFilesQuery(netsuiteFiles, netsuiteDomain, queryToSearch);
+    const formattedNetsuiteFiles = await getFilteredFiles(netsuiteFiles, netsuiteDomain, queryToSearch);
 
     showNetsuiteFiles(formattedNetsuiteFiles, netsuiteDomain);
 
@@ -288,22 +267,6 @@ async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
     }
 
     closeLoader();
-}
-
-// Set chrome storage local chunks spliting files array
-function divideFilesArrayStorage(filesArray) {
-    const divideSize = 1000;
-    const divided = Math.ceil(filesArray.length / divideSize);
-
-    let start = 0;
-    let end = divideSize;
-
-    for (let i = 0; i < divided; i++) {
-        const chunk = filesArray.slice(start, end);
-        saveChunkToIndexedDB(chunk, i + 1);
-        start = end;
-        end += divideSize;
-    }
 }
 
 async function retrieveChunksFromIndexedDB() {
@@ -448,4 +411,33 @@ function deleteAllChunksFromIndexedDB() {
             db.close();
         };
     };
+}
+
+async function addFileContent(netsuiteFiles, domain, batchSize = 1000) {
+    const totalFiles = netsuiteFiles.length;
+    let processedFiles = 0;
+    let resultFiles = [];
+
+    while (processedFiles < totalFiles) {
+        const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
+
+        const batchRequests = batchFiles.map(async (file) => {
+            const urlOpen = domain + file.url;
+
+            // Only search fetch file content if first time running else use file content from indexedDB
+            const fileContent = await getFileContent(urlOpen);
+
+            file.content = fileContent;
+
+            return file;
+        });
+
+        const batchResults = await Promise.all(batchRequests);
+        const batchFilesFiltered = batchResults.filter(Boolean);
+
+        resultFiles = resultFiles.concat(batchFilesFiltered);
+        processedFiles += batchFiles.length;
+    }
+
+    return resultFiles;
 }

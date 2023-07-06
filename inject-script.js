@@ -6,8 +6,6 @@ window.postMessage({ netsuiteFiles: getSuiteScriptFiles() || null, domain: getDo
 // ------------------- AUXILIAR FUNCTIONS -------------------------------
 function getSuiteScriptFiles(folder = ["-15", "-16"]) {
 
-    debugger;
-
     if (typeof filesResults == "undefined") {
         var filesResults = [];
     }
@@ -74,7 +72,8 @@ function getAllFiles(folder) {
                 internalid: result.getValue("internalid"),
                 name: result.getValue("name"),
                 folder: result.getText("folder"),
-                url: result.getValue("url")
+                url: result.getValue("url"),
+                content: null
             })));
         }
 
