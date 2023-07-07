@@ -2,7 +2,7 @@
 chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
   if (changeInfo.status === "loading" && tab.url === tab.url) {
     chrome.storage.local.clear();
-    deleteAllChunksFromIndexedDB();
+    // deleteAllChunksFromIndexedDB();
   }
 });
 
