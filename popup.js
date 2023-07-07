@@ -6,6 +6,9 @@ const $loader = document.querySelector(".lds-ring");
 const $totalResults = document.getElementById("total-results");
 const $wholeWordFilter = document.getElementsByName("switch-whole-word")[0];
 
+// Script Type Filter
+const $selectTypeFilter = document.getElementById("type-script-filter");
+
 // Copy to clipboard
 const copyToClipboard = document.getElementById('copyToClipboard');
 const copyToClipboardStatic = document.getElementById('copyToClipboardStatic');
@@ -14,13 +17,16 @@ const copyToClipboardGif = document.getElementById('copyToClipboardGif');
 let netsuiteFilesCopy = [];
 
 // Only show functionality when we are in netsuite page
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function ()
+{
 
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs)
+    {
         var currentUrl = tabs[0].url;
         var allowedUrl = "netsuite.com/app";
 
-        if (!currentUrl.includes(allowedUrl)) {
+        if (!currentUrl.includes(allowedUrl))
+        {
             // document.body.style.display = 'none';
             document.body.style.width = '210px';
             document.body.style.height = '80px';
@@ -39,30 +45,41 @@ document.addEventListener('DOMContentLoaded', function () {
     copyToClipboard.style.display = 'none';
 });
 
+// Filter type
+$selectTypeFilter.addEventListener("change", () =>
+{
+
+});
+
 // Handle button click event
-$getFilesBtn.addEventListener("click", async () => {
+$getFilesBtn.addEventListener("click", async () =>
+{
     $querySearch.blur();
     await triggerFunctionality();
 });
 
 // Handle Enter key press event
-$querySearch.addEventListener("keyup", async (event) => {
+$querySearch.addEventListener("keyup", async (event) =>
+{
 
-    if (event.key == "Enter") {
+    if (event.key == "Enter")
+    {
         $querySearch.blur();
         await triggerFunctionality();
     }
 });
 
 // Copy to clipboard btn
-copyToClipboard.addEventListener('click', async function () {
+copyToClipboard.addEventListener('click', async function ()
+{
 
     await setCopyToClipboard(JSON.stringify(netsuiteFilesCopy));
 
     copyToClipboardStatic.style.display = 'none';
     copyToClipboardGif.style.display = 'block';
 
-    setTimeout(function () {
+    setTimeout(function ()
+    {
         copyToClipboardStatic.style.display = 'block';
         copyToClipboardGif.style.display = 'none';
     }, 1000);
@@ -70,14 +87,16 @@ copyToClipboard.addEventListener('click', async function () {
 
 // -------------------- AUXILIAR FUNCTIONS ------------------------------------
 
-async function triggerFunctionality() {
+async function triggerFunctionality()
+{
     showLoader();
 
     // Hide copy to clipboard btn
     copyToClipboard.style.display = 'none';
 
     const queryToSearch = $querySearch.value;
-    if (!queryToSearch) {
+    if (!queryToSearch)
+    {
         alert("Insert field to search!.");
         closeLoader();
         return;
@@ -90,43 +109,54 @@ async function triggerFunctionality() {
 
     const netsuiteDomain = await getNetsuiteDomain();
 
-    if (!filesArray || filesArray.length === 0) {
+    if (!filesArray || filesArray.length === 0)
+    {
         const responseExecute = await chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: ["content-script.js"]
         });
     }
-    else {
+    else
+    {
         searchFiles(filesArray, queryToSearch, netsuiteDomain);
     }
 }
 
-function showLoader() {
+function showLoader()
+{
     $loader.style.display = "flex";
 }
 
-function closeLoader() {
+function closeLoader()
+{
     $loader.style.display = "none";
 }
 
-async function getActiveTabId() {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs && tabs.length > 0) {
+async function getActiveTabId()
+{
+    return new Promise((resolve, reject) =>
+    {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+        {
+            if (tabs && tabs.length > 0)
+            {
                 resolve(tabs[0].id);
-            } else {
+            } else
+            {
                 reject(new Error("Unable to retrieve active tab ID."));
             }
         });
     });
 }
 
-function showNetsuiteFiles(filteredFiles, domain) {
+function showNetsuiteFiles(filteredFiles, domain)
+{
     $bodyShowFiles.innerHTML = "";
     $totalResults.innerHTML = "0";
     $totalResults.innerHTML = filteredFiles.length;
 
-    if (!filteredFiles || filteredFiles.length < 1) {
+    if (!filteredFiles || filteredFiles.length < 1)
+    {
         $bodyShowFiles.innerHTML = `
             <tr><td></td></tr>
             <tr><td></td></tr>
@@ -136,8 +166,17 @@ function showNetsuiteFiles(filteredFiles, domain) {
             </tr> 
         `
     }
-    else {
-        filteredFiles.forEach(file => {
+    else
+    {
+        // Get unique type script
+        const fileTypesSet = new Set();
+
+        filteredFiles.forEach(file =>
+        {
+
+            // Filter type
+            const fileType = (file.script ? file.script.scripttype : 'File');
+            fileTypesSet.add(fileType);
 
             $bodyShowFiles.innerHTML += `
                 <tr>
@@ -158,17 +197,25 @@ function showNetsuiteFiles(filteredFiles, domain) {
                 </tr> 
             `
         });
+
+        const fileTypesArray = Array.from(fileTypesSet);
+
+        // Fill select with type as an option
+        
     }
 
 }
 
-async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
-    try {
+async function getFilteredFiles(netsuiteFiles, domain, queryToSearch)
+{
+    try
+    {
         if (!netsuiteFiles || netsuiteFiles.length < 1) return [];
 
         const filteredFiles = [];
 
-        netsuiteFiles.forEach(file => {
+        netsuiteFiles.forEach(file =>
+        {
             const fileContent = file.content;
 
             const regex = ($wholeWordFilter.checked) ? new RegExp('\\b' + queryToSearch + '\\b', 'gi') : new RegExp(queryToSearch, 'gi');
@@ -177,40 +224,48 @@ async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
 
             const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.internalid}`);
 
-            if (count > 0) {
+            if (count > 0)
+            {
                 filteredFiles.push({ name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
             }
         });
 
         return filteredFiles;
 
-    } catch (error) {
+    } catch (error)
+    {
         closeLoader();
         return [];
     }
 }
 
-async function getFileContent(url) {
-    try {
+async function getFileContent(url)
+{
+    try
+    {
         const response = await fetch(url);
         if (!response.ok) return null;
 
         const content = await response.text();
         return content;
-    } catch (error) {
+    } catch (error)
+    {
         return null;
     }
 }
 
-function delayExecution(delay) {
+function delayExecution(delay)
+{
     return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-async function setCopyToClipboard(text) {
+async function setCopyToClipboard(text)
+{
     await navigator.clipboard.writeText(text);
 }
 
-async function getNetsuiteDomain() {
+async function getNetsuiteDomain()
+{
     var url = await getCurrentTabUrl();
     if (!url) return null;
 
@@ -219,12 +274,17 @@ async function getNetsuiteDomain() {
     return domain;
 }
 
-function getCurrentTabUrl() {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs && tabs.length > 0) {
+function getCurrentTabUrl()
+{
+    return new Promise((resolve, reject) =>
+    {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+        {
+            if (tabs && tabs.length > 0)
+            {
                 resolve(tabs[0].url);
-            } else {
+            } else
+            {
                 reject(new Error("Unable to retrieve active tab URL."));
             }
         });
@@ -234,15 +294,18 @@ function getCurrentTabUrl() {
 // -------------------- CHROME EXTENSION FUNCTIONS ----------------------------
 
 // Listen for content-script response in order to save gathered files
-chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) =>
+{
 
-    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain")) {
+    if (!message.hasOwnProperty("netsuiteFiles") || !message.hasOwnProperty("domain"))
+    {
         closeLoader();
         return;
     }
 
     const queryToSearch = $querySearch.value;
-    if (!queryToSearch) {
+    if (!queryToSearch)
+    {
         alert("Insert field to search!.");
         closeLoader();
         return;
@@ -263,14 +326,17 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
 });
 
-async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
+async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain)
+{
 
-    if (!netsuiteFiles || netsuiteFiles.length < 1) {
+    if (!netsuiteFiles || netsuiteFiles.length < 1)
+    {
         closeLoader();
         return;
     }
 
-    if (!netsuiteDomain) {
+    if (!netsuiteDomain)
+    {
         closeLoader();
         return;
     }
@@ -281,29 +347,35 @@ async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
 
     netsuiteFilesCopy = formattedNetsuiteFiles;
 
-    if (netsuiteFilesCopy.length > 0) {
+    if (netsuiteFilesCopy.length > 0)
+    {
         copyToClipboard.style.display = 'block';
     }
 
     closeLoader();
 }
 
-async function retrieveChunksFromIndexedDB() {
+async function retrieveChunksFromIndexedDB()
+{
     const dbName = "netsuiteFilesDB";
     const storeName = "netsuiteFilesStore";
     const request = indexedDB.open(dbName);
 
-    return new Promise((resolve, reject) => {
-        request.onerror = function (event) {
+    return new Promise((resolve, reject) =>
+    {
+        request.onerror = function (event)
+        {
             console.error("IndexedDB error:", event.target.error);
             reject([]);
         };
 
-        request.onsuccess = function (event) {
+        request.onsuccess = function (event)
+        {
             const db = event.target.result;
 
             // Check if storeName exists before retrieving chunks
-            if (!db.objectStoreNames.contains(storeName)) {
+            if (!db.objectStoreNames.contains(storeName))
+            {
                 resolve([]); // Return empty array if storeName does not exist
                 db.close(); // Close the database connection
                 return;
@@ -314,48 +386,58 @@ async function retrieveChunksFromIndexedDB() {
             const chunks = [];
 
             const cursorRequest = store.openCursor();
-            cursorRequest.onsuccess = function (event) {
+            cursorRequest.onsuccess = function (event)
+            {
                 const cursor = event.target.result;
-                if (cursor) {
+                if (cursor)
+                {
                     const chunkObject = cursor.value;
                     chunks.push(chunkObject.data);
                     cursor.continue();
-                } else {
+                } else
+                {
                     resolve(chunks);
                 }
             };
 
-            transaction.oncomplete = function (event) {
+            transaction.oncomplete = function (event)
+            {
                 db.close();
             };
         };
     });
 }
 
-function saveChunkToIndexedDB(chunk, chunkIndex) {
+function saveChunkToIndexedDB(chunk, chunkIndex)
+{
     const dbName = "netsuiteFilesDB";
     const storeName = "netsuiteFilesStore";
     const version = Date.now();
     const request = indexedDB.open(dbName, version);
 
-    request.onerror = function (event) {
+    request.onerror = function (event)
+    {
         console.error("IndexedDB error:", event.target.error);
     };
 
-    request.onupgradeneeded = function (event) {
+    request.onupgradeneeded = function (event)
+    {
         const db = event.target.result;
 
         // Create the object store if it doesn't exist
-        if (!db.objectStoreNames.contains(storeName)) {
+        if (!db.objectStoreNames.contains(storeName))
+        {
             const store = db.createObjectStore(storeName, { keyPath: "id" });
             store.createIndex("chunkIndex", "chunkIndex", { unique: false });
         }
     };
 
-    request.onsuccess = function (event) {
+    request.onsuccess = function (event)
+    {
         const db = event.target.result;
 
-        if (!db.objectStoreNames.contains(storeName)) {
+        if (!db.objectStoreNames.contains(storeName))
+        {
             console.error("Object store not found:", storeName);
             db.close();
             return;
@@ -366,12 +448,15 @@ function saveChunkToIndexedDB(chunk, chunkIndex) {
 
         const getRequest = store.get(chunkIndex);
 
-        getRequest.onsuccess = function (event) {
+        getRequest.onsuccess = function (event)
+        {
             const existingChunk = event.target.result;
-            if (existingChunk) {
+            if (existingChunk)
+            {
                 console.log(`Chunk ${chunkIndex} already exists in IndexedDB.`);
                 // Handle the case when the chunk already exists
-            } else {
+            } else
+            {
                 const chunkObject = {
                     id: chunkIndex,
                     data: chunk,
@@ -379,38 +464,45 @@ function saveChunkToIndexedDB(chunk, chunkIndex) {
 
                 const addRequest = store.add(chunkObject);
 
-                addRequest.onsuccess = function (event) {
+                addRequest.onsuccess = function (event)
+                {
                     console.log(`Chunk ${chunkIndex} saved to IndexedDB.`);
                     // Handle the case when the chunk is successfully added
                 };
 
-                addRequest.onerror = function (event) {
+                addRequest.onerror = function (event)
+                {
                     console.error("Error saving chunk to IndexedDB:", event.target.error);
                     // Handle the error case when adding the chunk fails
                 };
             }
         };
 
-        transaction.oncomplete = function (event) {
+        transaction.oncomplete = function (event)
+        {
             db.close();
         };
     };
 }
 
-function deleteAllChunksFromIndexedDB() {
+function deleteAllChunksFromIndexedDB()
+{
     const dbName = "netsuiteFilesDB";
     const storeName = "netsuiteFilesStore";
     const request = indexedDB.open(dbName);
 
-    request.onerror = function (event) {
+    request.onerror = function (event)
+    {
         console.error("IndexedDB error:", event.target.error);
     };
 
-    request.onsuccess = function (event) {
+    request.onsuccess = function (event)
+    {
         const db = event.target.result;
 
         // Check if storeName exists before deleting
-        if (!db.objectStoreNames.contains(storeName)) {
+        if (!db.objectStoreNames.contains(storeName))
+        {
             return; // Exit the function or handle the situation accordingly
         }
 
@@ -418,29 +510,35 @@ function deleteAllChunksFromIndexedDB() {
         const store = transaction.objectStore(storeName);
         const clearRequest = store.clear();
 
-        clearRequest.onsuccess = function (event) {
+        clearRequest.onsuccess = function (event)
+        {
             console.log("All chunks deleted from IndexedDB.");
         };
 
-        clearRequest.onerror = function (event) {
+        clearRequest.onerror = function (event)
+        {
             console.error("Error deleting chunks from IndexedDB:", event.target.error);
         };
 
-        transaction.oncomplete = function (event) {
+        transaction.oncomplete = function (event)
+        {
             db.close();
         };
     };
 }
 
-async function addFileContent(netsuiteFiles, domain, batchSize = 1000) {
+async function addFileContent(netsuiteFiles, domain, batchSize = 1000)
+{
     const totalFiles = netsuiteFiles.length;
     let processedFiles = 0;
     let resultFiles = [];
 
-    while (processedFiles < totalFiles) {
+    while (processedFiles < totalFiles)
+    {
         const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
 
-        const batchRequests = batchFiles.map(async (file) => {
+        const batchRequests = batchFiles.map(async (file) =>
+        {
             const urlOpen = domain + file.url;
 
             // Only search fetch file content if first time running else use file content from indexedDB
