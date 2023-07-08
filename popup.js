@@ -1,10 +1,15 @@
 const $extensionContainer = document.querySelector(".extension-container");
-const $getFilesBtn = document.getElementById("get-files-netsuite");
+const $searchMagnifier = document.getElementById("search-magnifier");
 const $querySearch = document.getElementById("query-search");
 const $bodyShowFiles = document.getElementById("body-show-files");
 const $loader = document.querySelector(".lds-ring");
 const $totalResults = document.getElementById("total-results");
 const $wholeWordFilter = document.getElementsByName("switch-whole-word")[0];
+const $containerFiltertotal = document.querySelector(".container-filter-total");
+const $containerShowFiles = document.querySelector(".container-show-files");
+const $containerExportOpen = document.querySelector(".export-open-container");
+const $openFilesBtn = document.querySelector(".open-files-btn");
+const $checkboxesFiles = document.querySelectorAll(".checkbox-round");
 
 // Script Type Filter
 const $selectTypeFilter = document.getElementById("type-script-filter");
@@ -38,11 +43,51 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
         }
     });
-
-    // Hide copy to clipboard btn
-    copyToClipboard.style.display = 'none';
-    $selectTypeFilter.style.display = 'none';
 });
+
+
+// -------------------- CHECKBOCK OPEN FUNCTIONALITY ------------------------------------
+
+document.addEventListener('click', function (e) {
+
+    if (!e.target.classList.contains('checkbox-round')) return;
+
+    // Bring all checkbox and check if there are any checked
+    const $checkboxesFiles = document.querySelectorAll(".checkbox-round");
+
+    // If some checkbox contains checked then show btn open files
+    let isAnyChecked = $checkboxesFiles.length > 0 ? Array.from($checkboxesFiles).some(checkbox => checkbox.checked) : false;
+
+    if(isAnyChecked) {
+        $openFilesBtn.style.display = 'block';
+        return;
+    }
+
+    // Hide open files btn
+    $openFilesBtn.style.display = 'none';
+});
+
+
+$openFilesBtn.addEventListener('click', function () {
+
+    // Open several files functionality
+    const $checkboxesFiles = document.querySelectorAll(".checkbox-round");
+    if (!$checkboxesFiles || $checkboxesFiles.length === 0) {
+        alert("There are no files to open.");
+        return;
+    }
+
+    $checkboxesFiles.forEach(checkbox => {
+        if (checkbox.checked) {
+            const url = checkbox.dataset.url;
+
+            window.open(url, '_blank');
+        }
+    });
+
+});
+
+// ------------------------------------------------ ------------------------------------
 
 // Filter type
 $selectTypeFilter.addEventListener("change", () => {
@@ -50,7 +95,7 @@ $selectTypeFilter.addEventListener("change", () => {
     showLoader();
 
     const typeScript = $selectTypeFilter.value;
-    if (!typeScript){
+    if (!typeScript) {
         closeLoader();
         return;
     }
@@ -77,7 +122,7 @@ $selectTypeFilter.addEventListener("change", () => {
 });
 
 // Handle button click event
-$getFilesBtn.addEventListener("click", async () => {
+$searchMagnifier.addEventListener("click", async () => {
     $querySearch.blur();
     await triggerFunctionality();
 });
@@ -92,20 +137,20 @@ $querySearch.addEventListener("keyup", async (event) => {
 });
 
 // Copy to clipboard btn
-copyToClipboard.addEventListener('click', async function () {
+// copyToClipboard.addEventListener('click', async function () {
 
-    const itemsToCopy = filteredItemsByType.length > 0 ? filteredItemsByType : netsuiteFilesCopy;
+//     const itemsToCopy = filteredItemsByType.length > 0 ? filteredItemsByType : netsuiteFilesCopy;
 
-    await setCopyToClipboard(JSON.stringify(itemsToCopy));
+//     await setCopyToClipboard(JSON.stringify(itemsToCopy));
 
-    copyToClipboardStatic.style.display = 'none';
-    copyToClipboardGif.style.display = 'block';
+//     copyToClipboardStatic.style.display = 'none';
+//     copyToClipboardGif.style.display = 'block';
 
-    setTimeout(function () {
-        copyToClipboardStatic.style.display = 'block';
-        copyToClipboardGif.style.display = 'none';
-    }, 1000);
-});
+//     setTimeout(function () {
+//         copyToClipboardStatic.style.display = 'block';
+//         copyToClipboardGif.style.display = 'none';
+//     }, 1000);
+// });
 
 // -------------------- AUXILIAR FUNCTIONS ------------------------------------
 
@@ -113,8 +158,11 @@ async function triggerFunctionality() {
     showLoader();
 
     // Hide copy to clipboard btn
-    copyToClipboard.style.display = 'none';
-    $selectTypeFilter.style.display = 'none';
+    // copyToClipboard.style.display = 'none';
+    $containerFiltertotal.style.display = 'none';
+    $containerExportOpen.style.display = 'none';
+    $containerShowFiles.style.display = 'none';
+    $containerShowFiles.style.overflowY = 'hidden';
 
     const queryToSearch = $querySearch.value;
     if (!queryToSearch) {
@@ -167,13 +215,11 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
     $totalResults.innerHTML = filteredFiles.length;
 
     if (!filteredFiles || filteredFiles.length < 1) {
+        // No results found with div
         $bodyShowFiles.innerHTML = `
-            <tr><td></td></tr>
-            <tr><td></td></tr>
-            <tr><td></td></tr>
-            <tr>
-                <td colspan="4" style="text-align: center;">No results found</td>
-            </tr> 
+            <div>
+                <h2>No results found</h2>
+            </div>
         `
     }
     else {
@@ -190,25 +236,70 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
                 fileTypesSet.add(fileType);
             }
 
+            let icon;
+
+            if (file?.script?.scripttype) {
+                icon = `<svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+                <g clip-path="url(#clip0_19_169)">
+                    <path
+                        d="M20.4166 4.375V10.2083C20.4166 10.5951 20.5703 10.966 20.8438 11.2395C21.1173 11.513 21.4882 11.6667 21.875 11.6667H27.7083"
+                        stroke="#86868A" stroke-width="1.83333" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path
+                        d="M24.7916 30.625H10.2083C9.43474 30.625 8.69288 30.3177 8.1459 29.7707C7.59892 29.2237 7.29163 28.4819 7.29163 27.7083V7.29167C7.29163 6.51812 7.59892 5.77625 8.1459 5.22927C8.69288 4.68229 9.43474 4.375 10.2083 4.375H20.4166L27.7083 11.6667V27.7083C27.7083 28.4819 27.401 29.2237 26.854 29.7707C26.307 30.3177 25.5652 30.625 24.7916 30.625Z"
+                        fill="#86868A" stroke="#86868A" stroke-width="1.83333" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M14.5833 18.9583L13.125 21.875L14.5833 24.7917" stroke="#333333"
+                        stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M20.4166 18.9583L21.875 21.875L20.4166 24.7917" stroke="#333333"
+                        stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+                <defs>
+                    <clipPath id="clip0_19_169">
+                        <rect width="35" height="35" fill="white" />
+                    </clipPath>
+                </defs>
+            </svg>`
+            }
+            else {
+                icon = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+                <g clip-path="url(#clip0_25_71)">
+                <path d="M20.4166 4.375V10.2083C20.4166 10.5951 20.5703 10.966 20.8438 11.2395C21.1173 11.513 21.4882 11.6667 21.875 11.6667H27.7083" stroke="#333333" stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M24.7916 30.625H10.2083C9.43474 30.625 8.69288 30.3177 8.1459 29.7707C7.59892 29.2237 7.29163 28.4819 7.29163 27.7083V7.29167C7.29163 6.51812 7.59892 5.77625 8.1459 5.22927C8.69288 4.68229 9.43474 4.375 10.2083 4.375H20.4166L27.7083 11.6667V27.7083C27.7083 28.4819 27.401 29.2237 26.854 29.7707C26.307 30.3177 25.5652 30.625 24.7916 30.625Z" fill="#86868A" stroke="#86868A" stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13.125 24.7917H21.875" stroke="#333333" stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13.125 18.9583H21.875" stroke="#333333" stroke-width="1.83333" stroke-linecap="round" stroke-linejoin="round"/>
+                </g>
+                <defs>
+                <clipPath id="clip0_25_71">
+                <rect width="35" height="35" fill="white"/>
+                </clipPath>
+                </defs>
+                </svg>
+                `
+            }
 
             $bodyShowFiles.innerHTML += `
-                <tr>
-                    <td>${(file.script ? file.script.name : file.name)}</td>
-                    <td>${(file.script ? file.script.scripttype : 'File')}</td>
-                    <td>${file.folder}</td>
-                    <td>${file.count} ${(file.count == 1 ? 'time' : 'times')}</td>
-                    <td><a title="Go to file" href="${file.url}" target="_blank"><svg xmlns="http://www.w3.org/2000/svg"
-                        class="icon icon-tabler icon-tabler-file-search" width="30" height="30"
-                        viewBox="0 0 24 24" stroke-width="0.8" stroke="#2c3e50" fill="none"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                        <path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" />
-                        <path d="M16.5 17.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
-                        <path d="M18.5 19.5l2.5 2.5" />
-                        </svg></a></td>
-                </tr> 
-            `
+                    <div class="file-container">
+                        <!-- Icon file -->
+                        <div class="icon-file">
+                            ${icon}
+                        </div>
+                        <!-- File name and folder -->
+                        <div class="file-name-folder">
+                            <p>${(file.script ? file.script.name : file.name)}</p>
+                            <p style="color: #87878B;">./<span>${file.folder}</span></p>
+                        </div>
+    
+                        <!-- Script Type -->
+                        <div class="script-type">
+                            <p>${(file.script ? file.script.scripttype : 'File')}</p>
+                        </div>
+    
+                        <!-- Checkbox -->
+                        <input data-url="${file?.url}" type="checkbox" class="checkbox-round"/>
+                    </div>
+            `;
         });
 
         if (!filterType) {
@@ -223,8 +314,13 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
 
 
         if (filteredFiles.length > 0) {
-            copyToClipboard.style.display = 'block';
-            $selectTypeFilter.style.display = 'block';
+            $containerExportOpen.style.display = "flex";
+            $containerFiltertotal.style.display = "flex";
+            $containerShowFiles.style.display = "flex";
+
+            if (filteredFiles.length > 4) {
+                $containerShowFiles.style.overflowY = "scroll";
+            }
         }
     }
 
@@ -246,7 +342,7 @@ async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
             const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.internalid}`);
 
             if (count > 0) {
-                filteredFiles.push({ name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
+                filteredFiles.push({ id: file.internalid, name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
             }
         });
 
