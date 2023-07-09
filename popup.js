@@ -15,34 +15,8 @@ const $pleaseSearch = document.querySelector(".please-search");
 // Script Type Filter
 const $selectTypeFilter = document.getElementById("type-script-filter");
 
-// Copy to clipboard
-const copyToClipboard = document.getElementById('copyToClipboard');
-const copyToClipboardStatic = document.getElementById('copyToClipboardStatic');
-const copyToClipboardGif = document.getElementById('copyToClipboardGif');
-
 let netsuiteFilesCopy = [];
 let filteredItemsByType = [];
-
-// Only show functionality when we are in netsuite page
-document.addEventListener('DOMContentLoaded', function () {
-
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        var currentUrl = tabs[0].url;
-        var allowedUrl = "netsuite.com/app";
-
-        if (!currentUrl.includes(allowedUrl)) {
-            $extensionContainer.style.display = 'none';
-            document.body.style.width = '210px';
-            document.body.style.height = '80px';
-            body.innerHTML = `
-                <div class="not-netsuite-container">
-                    <h1>Not in Netsuite</h1>
-                </div>
-            `;
-        }
-    });
-});
-
 
 // -------------------- CHECKBOCK OPEN FUNCTIONALITY ------------------------------------
 
@@ -56,7 +30,7 @@ document.addEventListener('click', function (e) {
     // If some checkbox contains checked then show btn open files
     let isAnyChecked = $checkboxesFiles.length > 0 ? Array.from($checkboxesFiles).some(checkbox => checkbox.checked) : false;
 
-    if(isAnyChecked) {
+    if (isAnyChecked) {
         $openFilesBtn.style.display = 'block';
         return;
     }
@@ -134,22 +108,6 @@ $querySearch.addEventListener("keyup", async (event) => {
     }
 });
 
-// Copy to clipboard btn
-// copyToClipboard.addEventListener('click', async function () {
-
-//     const itemsToCopy = filteredItemsByType.length > 0 ? filteredItemsByType : netsuiteFilesCopy;
-
-//     await setCopyToClipboard(JSON.stringify(itemsToCopy));
-
-//     copyToClipboardStatic.style.display = 'none';
-//     copyToClipboardGif.style.display = 'block';
-
-//     setTimeout(function () {
-//         copyToClipboardStatic.style.display = 'block';
-//         copyToClipboardGif.style.display = 'none';
-//     }, 1000);
-// });
-
 // -------------------- AUXILIAR FUNCTIONS ------------------------------------
 
 async function triggerFunctionality() {
@@ -171,10 +129,10 @@ async function triggerFunctionality() {
 
     const tabId = await getActiveTabId();
 
-    // Get array files from indexedDB
-    const [filesArray] = await retrieveChunksFromIndexedDB();
-
     const netsuiteDomain = await getNetsuiteDomain();
+
+    // Get array files from indexedDB
+    const filesArray = await getFilesDB(netsuiteDomain);
 
     if (!filesArray || filesArray.length === 0) {
         const responseExecute = await chrome.scripting.executeScript({
@@ -333,10 +291,10 @@ async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
             const matches = fileContent.match(regex);
             const count = matches ? matches.length : 0;
 
-            const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.internalid}`);
+            const mediaItemUrl = (file.script ? `https://${domain}/app/common/scripting/script.nl?id=${file.script.scriptId}` : `https://${domain}/app/common/media/mediaitem.nl?id=${file.id}`);
 
             if (count > 0) {
-                filteredFiles.push({ id: file.internalid, name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
+                filteredFiles.push({ id: file.id, name: file.name, folder: file.folder, url: mediaItemUrl, count: count, script: file.script || null });
             }
         });
 
@@ -413,7 +371,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 1000);
 
     // Save files into indexedDB
-    saveChunkToIndexedDB(message.netsuiteFiles, 0);
+    saveFilesDB(message.netsuiteFiles, message.domain);
 
     // Saving domain
     chrome.storage.local.set({ netsuiteDomain: message.domain });
@@ -442,116 +400,104 @@ async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
     closeLoader();
 }
 
-async function retrieveChunksFromIndexedDB() {
-    const dbName = "netsuiteFilesDB";
-    const storeName = "netsuiteFilesStore";
-    const request = indexedDB.open(dbName);
-
+function getFilesDB(domain) {
     return new Promise((resolve, reject) => {
-        request.onerror = function (event) {
-            console.error("IndexedDB error:", event.target.error);
-            reject([]);
+        const dbName = 'netsuiteFilesDB';
+        const objectStoreName = 'netsuiteFilesStore';
+
+        const request = indexedDB.open(dbName);
+
+        request.onerror = (event) => {
+            reject(new Error('Failed to open database: ' + event.target.errorCode));
         };
 
-        request.onsuccess = function (event) {
+        request.onsuccess = (event) => {
             const db = event.target.result;
+            const transaction = db.transaction(objectStoreName, 'readonly');
+            const store = transaction.objectStore(objectStoreName);
 
-            // Check if storeName exists before retrieving chunks
-            if (!db.objectStoreNames.contains(storeName)) {
-                resolve([]); // Return empty array if storeName does not exist
-                db.close(); // Close the database connection
-                return;
-            }
+            const getRequest = store.get(domain);
 
-            const transaction = db.transaction(storeName, "readonly");
-            const store = transaction.objectStore(storeName);
-            const chunks = [];
+            getRequest.onerror = (event) => {
+                reject(new Error('Failed to retrieve data: ' + event.target.error));
+            };
 
-            const cursorRequest = store.openCursor();
-            cursorRequest.onsuccess = function (event) {
-                const cursor = event.target.result;
-                if (cursor) {
-                    const chunkObject = cursor.value;
-                    chunks.push(chunkObject.data);
-                    cursor.continue();
+            getRequest.onsuccess = (event) => {
+                const result = event.target.result;
+
+                if (result) {
+                    resolve(result.data);
                 } else {
-                    resolve(chunks);
+                    resolve(null); // Or you can resolve with a default value if desired
                 }
             };
 
-            transaction.oncomplete = function (event) {
+            transaction.onerror = (event) => {
+                reject(new Error('Transaction error: ' + event.target.error));
+            };
+
+            transaction.oncomplete = () => {
                 db.close();
             };
         };
     });
 }
 
-function saveChunkToIndexedDB(chunk, chunkIndex) {
-    const dbName = "netsuiteFilesDB";
-    const storeName = "netsuiteFilesStore";
+function saveFilesDB(arrayFiles, domain) {
+    const dbName = 'netsuiteFilesDB';
+    const objectStoreName = 'netsuiteFilesStore';
     const version = Date.now();
+
+    // Open the database
     const request = indexedDB.open(dbName, version);
 
-    request.onerror = function (event) {
-        console.error("IndexedDB error:", event.target.error);
+    request.onerror = (event) => {
+        console.error('Failed to open database:', event.target.errorCode);
     };
 
-    request.onupgradeneeded = function (event) {
-        const db = event.target.result;
+    request.onupgradeneeded = (event) => {
+        const db = event.currentTarget.result;
 
-        // Create the object store if it doesn't exist
-        if (!db.objectStoreNames.contains(storeName)) {
-            const store = db.createObjectStore(storeName, { keyPath: "id" });
-            store.createIndex("chunkIndex", "chunkIndex", { unique: false });
+        // Create an object store (if it doesn't exist)
+        if (!db.objectStoreNames.contains(objectStoreName)) {
+            const objectStore = db.createObjectStore(objectStoreName, { keyPath: 'id' });
+            objectStore.createIndex('idIndex', 'id', { unique: true });
         }
     };
 
-    request.onsuccess = function (event) {
+    request.onsuccess = (event) => {
         const db = event.target.result;
 
-        if (!db.objectStoreNames.contains(storeName)) {
-            console.error("Object store not found:", storeName);
-            db.close();
-            return;
-        }
+        // Start a transaction
+        const transaction = db.transaction(objectStoreName, 'readwrite');
 
-        const transaction = db.transaction(storeName, "readwrite");
-        const store = transaction.objectStore(storeName);
+        // Get the object store
+        const store = transaction.objectStore(objectStoreName);
 
-        const getRequest = store.get(chunkIndex);
+        // Save files to the object store
+        arrayFiles.forEach((file) => {
+            const addRequest = store.add({ domain: domain, file: file });
 
-        getRequest.onsuccess = function (event) {
-            const existingChunk = event.target.result;
-            if (existingChunk) {
-                console.log(`Chunk ${chunkIndex} already exists in IndexedDB.`);
-                // Handle the case when the chunk already exists
-            } else {
-                const chunkObject = {
-                    id: chunkIndex,
-                    data: chunk,
-                };
+            addRequest.onerror = (event) => {
+                console.error('Failed to add data:', event.target.error);
+            };
 
-                const addRequest = store.add(chunkObject);
+            addRequest.onsuccess = (event) => {
+                console.log('Data added successfully.');
+            };
+        });
 
-                addRequest.onsuccess = function (event) {
-                    console.log(`Chunk ${chunkIndex} saved to IndexedDB.`);
-                    // Handle the case when the chunk is successfully added
-                };
-
-                addRequest.onerror = function (event) {
-                    console.error("Error saving chunk to IndexedDB:", event.target.error);
-                    // Handle the error case when adding the chunk fails
-                };
-            }
+        transaction.onerror = (event) => {
+            console.error('Transaction error:', event.target.error);
         };
 
-        transaction.oncomplete = function (event) {
+        transaction.oncomplete = () => {
             db.close();
         };
     };
 }
 
-function deleteAllChunksFromIndexedDB() {
+function deleteDatabase() {
     const dbName = "netsuiteFilesDB";
     const storeName = "netsuiteFilesStore";
     const request = indexedDB.open(dbName);
@@ -564,9 +510,7 @@ function deleteAllChunksFromIndexedDB() {
         const db = event.target.result;
 
         // Check if storeName exists before deleting
-        if (!db.objectStoreNames.contains(storeName)) {
-            return; // Exit the function or handle the situation accordingly
-        }
+        if (!db.objectStoreNames.contains(storeName)) return;
 
         const transaction = db.transaction(storeName, "readwrite");
         const store = transaction.objectStore(storeName);

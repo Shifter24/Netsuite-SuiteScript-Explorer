@@ -69,7 +69,7 @@ function getAllFiles(folder) {
         // Add the results to the array
         if (fileSearch && fileSearch.length > 0) {
             filesResults = filesResults.concat(fileSearch.map((result) => ({
-                internalid: result.getValue("internalid"),
+                id: result.getValue("internalid"),
                 name: result.getValue("name"),
                 folder: result.getText("folder"),
                 url: result.getValue("url"),
