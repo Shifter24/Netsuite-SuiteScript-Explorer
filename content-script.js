@@ -1,5 +1,3 @@
-
-
 injectScript(chrome.runtime.getURL("inject-script.js"), "body");
 
 // Listen when inject-script sent files

@@ -10,7 +10,8 @@ const $containerShowFiles = document.querySelector(".container-show-files");
 const $containerExportOpen = document.querySelector(".export-open-container");
 const $openFilesBtn = document.querySelector(".open-files-btn");
 const $checkboxesFiles = document.querySelectorAll(".checkbox-round");
-
+const $filesNotFound = document.querySelector(".files-not-found");
+const $pleaseSearch = document.querySelector(".please-search");
 // Script Type Filter
 const $selectTypeFilter = document.getElementById("type-script-filter");
 
@@ -30,15 +31,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var allowedUrl = "netsuite.com/app";
 
         if (!currentUrl.includes(allowedUrl)) {
-            // document.body.style.display = 'none';
+            $extensionContainer.style.display = 'none';
             document.body.style.width = '210px';
             document.body.style.height = '80px';
-            $extensionContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <h4 class="alert-heading">Error!</h4>
-                    <p>You are not in a NetSuite page.</p>
-                    <hr>
-                    <p class="mb-0">Please go to a NetSuite page and try again.</p>
+            body.innerHTML = `
+                <div class="not-netsuite-container">
+                    <h1>Not in Netsuite</h1>
                 </div>
             `;
         }
@@ -159,10 +157,10 @@ async function triggerFunctionality() {
 
     // Hide copy to clipboard btn
     // copyToClipboard.style.display = 'none';
+    $filesNotFound.style.display = "none";
     $containerFiltertotal.style.display = 'none';
     $containerExportOpen.style.display = 'none';
-    $containerShowFiles.style.display = 'none';
-    $containerShowFiles.style.overflowY = 'hidden';
+    $pleaseSearch.style.display = 'none';
 
     const queryToSearch = $querySearch.value;
     if (!queryToSearch) {
@@ -215,12 +213,8 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
     $totalResults.innerHTML = filteredFiles.length;
 
     if (!filteredFiles || filteredFiles.length < 1) {
-        // No results found with div
-        $bodyShowFiles.innerHTML = `
-            <div>
-                <h2>No results found</h2>
-            </div>
-        `
+        $filesNotFound.style.display = "flex";
+        $containerShowFiles.style.overflowY = "hidden";
     }
     else {
         // Get unique type script
@@ -312,11 +306,11 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
         `;
         }
 
+        $containerShowFiles.style.overflowY = "hidden";
 
         if (filteredFiles.length > 0) {
             $containerExportOpen.style.display = "flex";
             $containerFiltertotal.style.display = "flex";
-            $containerShowFiles.style.display = "flex";
 
             if (filteredFiles.length > 4) {
                 $containerShowFiles.style.overflowY = "scroll";

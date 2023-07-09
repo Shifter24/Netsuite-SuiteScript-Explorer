@@ -5,11 +5,57 @@
     font-family: 'Montserrat', sans-serif;
 }
 
+body{
+  width: 700px;
+  height: 600px;
+}
+
+/* MOFIYING SCROLLBAR */
+
+/* width */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #232129;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #888;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* -------------------------------------- */
+
+.please-search{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.files-not-found{
+  display: none;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+
 .extension-container{
   padding: 1rem 5rem;
   margin: auto;
-  width: 700px;
-  height: 600px;
+  width: 100%;
+  height: 100%;
   background: #19171E;
 }
 
@@ -75,7 +121,7 @@
 }
 
 .container-show-files{
-  display: none; width: 100%; height: 256px; overflow-x: hidden; overflow-y: hidden;
+  display: flex; width: 100%; height: 256px; overflow-x: hidden; overflow-y: hidden;
 }
 
 .container-show-files .file-container{

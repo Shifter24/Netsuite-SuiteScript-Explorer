@@ -18,7 +18,8 @@
         "storage",
         "activeTab",
         "scripting",
-        "tabs"
+        "tabs",
+        "declarativeContent"
     ],
     "host_permissions": [
         "https://*.netsuite.com/app/*"
