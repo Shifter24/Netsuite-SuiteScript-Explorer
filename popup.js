@@ -69,7 +69,7 @@ $openFilesBtn.addEventListener('click', function () {
 
 // Filter type
 $selectTypeFilter.addEventListener("change", async () => {
-    
+
     showLoader();
 
     const typeScript = $selectTypeFilter.value;
@@ -421,7 +421,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         chrome.storage.local.clear();
 
         // Add file content to files in order to save into indexedDB
-        message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 1000);
+        message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 800);
 
         // Save files into indexedDB
         saveFilesDB(message.netsuiteFiles, message.domain);
@@ -468,10 +468,23 @@ function getFilesDB(domain) {
 
         request.onsuccess = (event) => {
             const db = event.target.result;
+
+            if (!db.objectStoreNames.contains(objectStoreName)) {
+                resolve(null);
+                db.close();
+                return;
+            }
+
             const transaction = db.transaction(objectStoreName, 'readonly');
             const store = transaction.objectStore(objectStoreName);
 
-            const getRequest = store.get(domain);
+            if (!store.indexNames.contains('domain')) {
+                resolve(null);
+                db.close();
+                return;
+            }
+
+            const getRequest = store.index('domain').get(domain);
 
             getRequest.onerror = (event) => {
                 reject(new Error('Failed to retrieve data: ' + event.target.error));
