@@ -12,6 +12,12 @@ const $openFilesBtn = document.querySelector(".open-files-btn");
 const $checkboxesFiles = document.querySelectorAll(".checkbox-round");
 const $filesNotFound = document.querySelector(".files-not-found");
 const $pleaseSearch = document.querySelector(".please-search");
+
+// Exports
+const $exportJson = document.getElementById("export-to-json");
+const $exportTxt = document.getElementById("export-to-txt");
+const $exportCsv = document.getElementById("export-to-csv");
+
 // Script Type Filter
 const $selectTypeFilter = document.getElementById("type-script-filter");
 
@@ -62,8 +68,8 @@ $openFilesBtn.addEventListener('click', function () {
 // ------------------------------------------------ ------------------------------------
 
 // Filter type
-$selectTypeFilter.addEventListener("change", () => {
-
+$selectTypeFilter.addEventListener("change", async () => {
+    
     showLoader();
 
     const typeScript = $selectTypeFilter.value;
@@ -86,7 +92,7 @@ $selectTypeFilter.addEventListener("change", () => {
         return fileType == typeScript;
     });
 
-    showNetsuiteFiles(filteredFiles, typeScript);
+    await showNetsuiteFiles(filteredFiles, typeScript);
 
     filteredItemsByType = filteredFiles;
 
@@ -94,13 +100,16 @@ $selectTypeFilter.addEventListener("change", () => {
 });
 
 // Handle button click event
-$searchMagnifier.addEventListener("click", async () => {
+$searchMagnifier.addEventListener("click", async (event) => {
+    event.preventDefault();
     $querySearch.blur();
     await triggerFunctionality();
 });
 
 // Handle Enter key press event
 $querySearch.addEventListener("keyup", async (event) => {
+
+    event.preventDefault();
 
     if (event.key == "Enter") {
         $querySearch.blur();
@@ -113,12 +122,9 @@ $querySearch.addEventListener("keyup", async (event) => {
 async function triggerFunctionality() {
     showLoader();
 
-    // Hide copy to clipboard btn
-    // copyToClipboard.style.display = 'none';
     $filesNotFound.style.display = "none";
     $containerFiltertotal.style.display = 'none';
     $containerExportOpen.style.display = 'none';
-    $pleaseSearch.style.display = 'none';
 
     const queryToSearch = $querySearch.value;
     if (!queryToSearch) {
@@ -127,22 +133,14 @@ async function triggerFunctionality() {
         return;
     }
 
+    $pleaseSearch.style.display = 'none';
+
     const tabId = await getActiveTabId();
 
-    const netsuiteDomain = await getNetsuiteDomain();
-
-    // Get array files from indexedDB
-    const filesArray = await getFilesDB(netsuiteDomain);
-
-    if (!filesArray || filesArray.length === 0) {
-        const responseExecute = await chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            files: ["content-script.js"]
-        });
-    }
-    else {
-        searchFiles(filesArray, queryToSearch, netsuiteDomain);
-    }
+    const responseExecute = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ["content-script.js"]
+    });
 }
 
 function showLoader() {
@@ -165,7 +163,7 @@ async function getActiveTabId() {
     });
 }
 
-function showNetsuiteFiles(filteredFiles, filterType = false) {
+async function showNetsuiteFiles(filteredFiles, filterType = false) {
     $bodyShowFiles.innerHTML = "";
     $totalResults.innerHTML = "0";
     $totalResults.innerHTML = filteredFiles.length;
@@ -268,6 +266,11 @@ function showNetsuiteFiles(filteredFiles, filterType = false) {
 
         if (filteredFiles.length > 0) {
             $containerExportOpen.style.display = "flex";
+
+            // Exports files
+            makeExportFiles(filteredFiles);
+            // --------------------------
+
             $containerFiltertotal.style.display = "flex";
 
             if (filteredFiles.length > 4) {
@@ -306,18 +309,6 @@ async function getFilteredFiles(netsuiteFiles, domain, queryToSearch) {
     }
 }
 
-async function getFileContent(url) {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) return null;
-
-        const content = await response.text();
-        return content;
-    } catch (error) {
-        return null;
-    }
-}
-
 function delayExecution(delay) {
     return new Promise((resolve) => setTimeout(resolve, delay));
 }
@@ -347,6 +338,51 @@ function getCurrentTabUrl() {
     });
 }
 
+function makeExportFiles(filteredFiles) {
+    const stringFiles = JSON.stringify(filteredFiles);
+
+    // JSON
+    const blobJson = new Blob([stringFiles], { type: "application/json" });
+    const urlJson = URL.createObjectURL(blobJson);
+
+    $exportJson.setAttribute("href", urlJson);
+    $exportJson.setAttribute("download", `files_${$querySearch.value}.json`);
+
+    // TXT
+    const blobTxt = new Blob([stringFiles], { type: "text/plain" });
+    const urlTxt = URL.createObjectURL(blobTxt);
+
+    $exportTxt.setAttribute("href", urlTxt);
+    $exportTxt.setAttribute("download", `files_${$querySearch.value}.txt`);
+
+    // CSV
+    // Prepare CSV header
+    const csvHeader = Object.keys(filteredFiles[0]).join(',');
+
+    // Prepare CSV data rows
+    const csvRows = filteredFiles.map(file => {
+        const values = Object.values(file).map(value => {
+            if (typeof value === 'object') {
+                return JSON.stringify(value);
+            }
+            return value;
+        });
+        return values.join(',');
+    });
+
+    // Combine header and rows
+    const csvContent = csvHeader + '\n' + csvRows.join('\n');
+
+    // Create a Blob object
+    const blobCsv = new Blob([csvContent], { type: 'text/csv' });
+
+    // Generate a URL for the Blob
+    const urlCsv = URL.createObjectURL(blobCsv);
+
+    $exportCsv.setAttribute("href", urlCsv);
+    $exportCsv.setAttribute("download", `files_${$querySearch.value}.csv`);
+
+}
 // -------------------- CHROME EXTENSION FUNCTIONS ----------------------------
 
 // Listen for content-script response in order to save gathered files
@@ -364,19 +400,38 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         return;
     }
 
-    // Clear storage
-    chrome.storage.local.clear();
+    // ----------------- COMPARE IF THERE ARE NEW FILES ----------------------------
 
-    // Add file content to files in order to save into indexedDB
-    message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 1000);
+    const netsuiteFilesDB = await getFilesDB(message.domain);
 
-    // Save files into indexedDB
-    saveFilesDB(message.netsuiteFiles, message.domain);
+    // If there are files stored into db, we are going to look for changes in files
+    if (netsuiteFilesDB && netsuiteFilesDB?.length > 0) {
+        message.netsuiteFiles = await getFilesChanged(message.netsuiteFiles, netsuiteFilesDB, message.domain);
 
-    // Saving domain
-    chrome.storage.local.set({ netsuiteDomain: message.domain });
+        // Clear storage
+        chrome.storage.local.clear();
 
-    await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
+        // Save files into indexedDB
+        saveFilesDB(message.netsuiteFiles, message.domain);
+
+        await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
+    }
+    else {
+        // Clear storage
+        chrome.storage.local.clear();
+
+        // Add file content to files in order to save into indexedDB
+        message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 1000);
+
+        // Save files into indexedDB
+        saveFilesDB(message.netsuiteFiles, message.domain);
+
+        // Saving domain
+        chrome.storage.local.set({ netsuiteDomain: message.domain });
+
+        await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
+    }
+
 });
 
 async function searchFiles(netsuiteFiles, queryToSearch, netsuiteDomain) {
@@ -444,54 +499,77 @@ function getFilesDB(domain) {
 }
 
 function saveFilesDB(arrayFiles, domain) {
-    const dbName = 'netsuiteFilesDB';
-    const objectStoreName = 'netsuiteFilesStore';
-    const version = Date.now();
+    const dbName = "netsuiteFilesDB";
+    const storeName = "netsuiteFilesStore";
+    const version = Date.now(); // Use timestamp as the version number
 
-    // Open the database
     const request = indexedDB.open(dbName, version);
 
-    request.onerror = (event) => {
-        console.error('Failed to open database:', event.target.errorCode);
+    request.onerror = function (event) {
+        console.error("IndexedDB error:", event.target.error);
     };
 
-    request.onupgradeneeded = (event) => {
-        const db = event.currentTarget.result;
+    request.onupgradeneeded = function (event) {
+        const db = event.target.result;
 
-        // Create an object store (if it doesn't exist)
-        if (!db.objectStoreNames.contains(objectStoreName)) {
-            const objectStore = db.createObjectStore(objectStoreName, { keyPath: 'id' });
-            objectStore.createIndex('idIndex', 'id', { unique: true });
+        // Create the object store if it doesn't exist
+        if (!db.objectStoreNames.contains(storeName)) {
+            const store = db.createObjectStore(storeName, { keyPath: "id" });
+            store.createIndex("domain", "domain", { unique: false });
         }
     };
 
-    request.onsuccess = (event) => {
+    request.onsuccess = function (event) {
         const db = event.target.result;
 
-        // Start a transaction
-        const transaction = db.transaction(objectStoreName, 'readwrite');
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.error("Object store not found:", storeName);
+            db.close();
+            return;
+        }
 
-        // Get the object store
-        const store = transaction.objectStore(objectStoreName);
+        const transaction = db.transaction(storeName, "readwrite");
+        const store = transaction.objectStore(storeName);
 
-        // Save files to the object store
-        arrayFiles.forEach((file) => {
-            const addRequest = store.add({ domain: domain, file: file });
+        const getRequest = store.get(domain);
 
-            addRequest.onerror = (event) => {
-                console.error('Failed to add data:', event.target.error);
-            };
+        getRequest.onsuccess = function (event) {
+            const existingDomain = event.target.result;
+            if (existingDomain) {
+                console.log(`Array files for ${domain} already exist in IndexedDB. Overwriting...`);
+                existingDomain.data = arrayFiles;
+                const updateRequest = store.put(existingDomain);
 
-            addRequest.onsuccess = (event) => {
-                console.log('Data added successfully.');
-            };
-        });
+                updateRequest.onsuccess = function (event) {
+                    console.log(`Array files for ${domain} updated in IndexedDB.`);
+                    // Handle the case when the arrayFiles are successfully updated
+                };
 
-        transaction.onerror = (event) => {
-            console.error('Transaction error:', event.target.error);
+                updateRequest.onerror = function (event) {
+                    console.error("Error updating arrayFiles in IndexedDB:", event.target.error);
+                    // Handle the error case when updating the arrayFiles fails
+                };
+            } else {
+                const domainObject = {
+                    id: domain,
+                    data: arrayFiles,
+                };
+
+                const addRequest = store.add(domainObject);
+
+                addRequest.onsuccess = function (event) {
+                    console.log(`Array files for ${domain} saved to IndexedDB.`);
+                    // Handle the case when the arrayFiles are successfully added
+                };
+
+                addRequest.onerror = function (event) {
+                    console.error("Error saving arrayFiles to IndexedDB:", event.target.error);
+                    // Handle the error case when adding the arrayFiles fails
+                };
+            }
         };
 
-        transaction.oncomplete = () => {
+        transaction.oncomplete = function (event) {
             db.close();
         };
     };
@@ -530,7 +608,105 @@ function deleteDatabase() {
     };
 }
 
-async function addFileContent(netsuiteFiles, domain, batchSize = 1000) {
+async function equalObjects(obj1, obj2) {
+    // Check if the objects are strictly equal
+    if (obj1 === obj2) {
+        return true;
+    }
+
+    // Check if both objects are objects and not null
+    if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) {
+        return false;
+    }
+
+    // Check if both objects have the same number of properties
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+    if (keys1.length !== keys2.length) {
+        return false;
+    }
+
+    // Recursively compare each property of the objects
+    for (const key of keys1) {
+        if (!equalObjects(obj1[key], obj2[key])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+async function getFilesChanged(netsuiteFiles, filesInDB, domain) {
+
+    let newFiles = [];
+    let filesChanged = [];
+
+    for (const file of netsuiteFiles) {
+        const fileInDB = filesInDB.find((fileDB) => fileDB.id === file.id);
+
+        // If file does not exist inside the DB, it means it is a new file
+        if (!fileInDB) {
+            // Get content from netsuite for that file
+            const url = domain + file.url;
+            const fileContent = await getFileContent(url);
+
+            file.content = fileContent;
+            newFiles.push(file);
+            continue;
+        }
+
+
+        const fileChanged = await equalObjects(file, fileInDB);
+
+        // If the object exist in db but is different, it means it has changed
+        if (!fileChanged) {
+            // Get content from netsuite for that file
+            const url = domain + file.url;
+            const fileContent = await getFileContent(url);
+
+            file.content = fileContent;
+            filesChanged.push(file);
+            continue;
+        }
+
+        // If file in db does not have content, it means was an uploaded file without content
+        if (fileInDB?.content == null) {
+            // Get content from netsuite for that file
+            const url = domain + file.url;
+            const fileContent = await getFileContent(url);
+
+            file.content = fileContent;
+            filesChanged.push(file);
+            continue;
+        }
+
+        // Check if modified date is different
+        if (file.modified !== fileInDB.modified) {
+            // Get content from netsuite for that file
+            const url = domain + file.url;
+            const fileContent = await getFileContent(url);
+
+            file.content = fileContent;
+            filesChanged.push(file);
+            continue;
+        }
+    }//End for
+
+    // Add new files into netsuiteFiles array
+    filesInDB = filesInDB.concat(newFiles);
+
+    // Overwrite files that changed into filesDB array
+    for (const fileChanged of filesChanged) {
+        const index = filesInDB.findIndex((file) => file.id === fileChanged.id);
+        filesInDB[index] = fileChanged;
+    }
+
+    return filesInDB;
+}
+
+// ----------------- ADD FILE CONTENT LOGIC ----------------- //
+async function addFileContent(netsuiteFiles, domain, batchSize = 800) {
+
     const totalFiles = netsuiteFiles.length;
     let processedFiles = 0;
     let resultFiles = [];
@@ -538,18 +714,8 @@ async function addFileContent(netsuiteFiles, domain, batchSize = 1000) {
     while (processedFiles < totalFiles) {
         const batchFiles = netsuiteFiles.slice(processedFiles, processedFiles + batchSize);
 
-        const batchRequests = batchFiles.map(async (file) => {
-            const urlOpen = domain + file.url;
+        const batchResults = await fetchFilesWithRetry(batchFiles, domain);
 
-            // Only search fetch file content if first time running else use file content from indexedDB
-            const fileContent = await getFileContent(urlOpen);
-
-            file.content = fileContent;
-
-            return file;
-        });
-
-        const batchResults = await Promise.all(batchRequests);
         const batchFilesFiltered = batchResults.filter(Boolean);
 
         resultFiles = resultFiles.concat(batchFilesFiltered);
@@ -558,3 +724,55 @@ async function addFileContent(netsuiteFiles, domain, batchSize = 1000) {
 
     return resultFiles;
 }
+
+async function fetchFilesWithRetry(files, domain, maxRetries = 3) {
+    let retries = 0;
+    let result = [];
+
+    while (retries < maxRetries) {
+        try {
+            const batchRequests = files.map(async (file) => {
+                const urlOpen = domain + file.url;
+                const fileContent = await getFileContent(urlOpen);
+
+                file.content = fileContent;
+
+                return file;
+            });
+
+            result = await Promise.all(batchRequests);
+            break;
+        } catch (error) {
+            retries++;
+            if (retries >= maxRetries) {
+                // Handle retries exceeded error
+                console.error("Maximum retries exceeded. Error:", error);
+                break;
+            }
+
+            // Delay before retrying
+            await delay(1500); // Adjust the delay duration as needed
+        }
+    }
+
+    return result;
+}
+
+async function getFileContent(url) {
+    try {
+        if (!url.includes("https://")) url = "https://" + url;
+
+        const response = await fetch(url);
+        if (!response.ok) return null;
+
+        const content = await response.text();
+        return content;
+    } catch (error) {
+        return null;
+    }
+}
+
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+// -----------------------------------------------------------------------------------------

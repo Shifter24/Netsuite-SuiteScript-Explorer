@@ -57,7 +57,8 @@ function getAllFiles(folder) {
                 new nlobjSearchColumn("internalid").setSort(false),
                 new nlobjSearchColumn("name"),
                 new nlobjSearchColumn("folder"),
-                new nlobjSearchColumn("url")
+                new nlobjSearchColumn("url"),
+                new nlobjSearchColumn("modified")
             ]
         );
 
@@ -73,7 +74,8 @@ function getAllFiles(folder) {
                 name: result.getValue("name"),
                 folder: result.getText("folder"),
                 url: result.getValue("url"),
-                content: null
+                content: null,
+                modified: result.getValue("modified")
             })));
         }
 
@@ -132,7 +134,17 @@ function getAllScripts() {
 }
 
 function getDomain() {
-    return domain = window.location.href.match(/^(?:https?:\/\/)?([^\/]+)/i)[0];
+
+    if(typeof domain == "undefined")
+    {
+        var domain;
+    }
+
+    domain = window.location.href.match(/^(?:https?:\/\/)?([^\/]+)/i)[0];
+
+    if(domain.includes('https://')) domain = domain.replace('https://', '');
+
+    return domain; 
 }
 
 function joinFilesWScripts(arrayFiles, arrayScripts) {
