@@ -408,26 +408,18 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     if (netsuiteFilesDB && netsuiteFilesDB?.length > 0) {
         message.netsuiteFiles = await getFilesChanged(message.netsuiteFiles, netsuiteFilesDB, message.domain);
 
-        // Clear storage
-        chrome.storage.local.clear();
-
         // Save files into indexedDB
         saveFilesDB(message.netsuiteFiles, message.domain);
 
         await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
     }
     else {
-        // Clear storage
-        chrome.storage.local.clear();
 
         // Add file content to files in order to save into indexedDB
         message.netsuiteFiles = await addFileContent(message.netsuiteFiles, message.domain, 800);
 
         // Save files into indexedDB
         saveFilesDB(message.netsuiteFiles, message.domain);
-
-        // Saving domain
-        chrome.storage.local.set({ netsuiteDomain: message.domain });
 
         await searchFiles(message.netsuiteFiles, queryToSearch, message.domain);
     }
@@ -475,16 +467,11 @@ function getFilesDB(domain) {
                 return;
             }
 
+
             const transaction = db.transaction(objectStoreName, 'readonly');
             const store = transaction.objectStore(objectStoreName);
 
-            if (!store.indexNames.contains('domain')) {
-                resolve(null);
-                db.close();
-                return;
-            }
-
-            const getRequest = store.index('domain').get(domain);
+            const getRequest = store.get(domain);
 
             getRequest.onerror = (event) => {
                 reject(new Error('Failed to retrieve data: ' + event.target.error));
