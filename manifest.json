@@ -1,6 +1,6 @@
 {
     "name": "Netsuite SuiteScript Explorer",
-    "description": "Extension that allows you to find Suite Scripts that contain a certain string.",
+    "description": "Chrome extension that allows Netsuite developers to find a SuiteScript file by searching for a specific string within that file.",
     "version": "0.1.3",
     "manifest_version": 3,
     "background": {
