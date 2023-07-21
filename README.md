@@ -1,10 +1,12 @@
 # Netsuite-SuiteScript-Explorer
 
+Chrome extension: https://chrome.google.com/webstore/detail/netsuite-suitescript-expl/fnbdepihngngmaclhaofloikdlemomhd
+
 # Synopsis
 Netsuite SuiteScript Explorer is a Chrome extension that allows Netsuite developers to find a SuiteScript file by searching for a specific string within that file.
 
-![image](https://github.com/Shifter24/Netsuite-SuiteScript-Explorer/assets/81487018/9e0ea415-9905-4757-aa8f-3f7e2a8d800e)
-![image](https://github.com/Shifter24/Netsuite-SuiteScript-Explorer/assets/81487018/361d2b95-76bb-4e2a-bcf8-8b877e70411f)
+![image](https://lh3.googleusercontent.com/drvYUFWTnjfZ5DI36gozMfUylERr1q1-_X5cW8UvzXbuZFsJd-n8lw9Ar9KPxlfkI4jYnPMecLc2Q9c-fPYkdncJ1Q=w640-h400-e365-rj-sc0x00ffffff)
+![image](https://lh3.googleusercontent.com/G9ifFBf9sUDtp82ZlqFPxodOoEvZwdSp8K4XnzO7ixWdrSgKmXijM7afXm-Vm4GqI5tcxP5wo382kzkn2aAGMJeL=w640-h400-e365-rj-sc0x00ffffff)
 
 # Key features
 
